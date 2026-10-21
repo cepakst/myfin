@@ -1,0 +1,2 @@
+# myfin
+My finance app
