@@ -1,0 +1,28 @@
+# Personal data - never commit
+exports/
+data/
+*.db
+*.sqlite
+*.xlsx
+*.csv
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+dist-electron/
+
+# Misc
+.env
+.vscode/
+.idea/
+
+
+# research downloads (official forms, not part of the app)
+taxresearch/

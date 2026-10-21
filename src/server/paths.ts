@@ -1,0 +1,18 @@
+import { mkdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+/** Project root: two levels up from src/server or dist/server */
+export const ROOT = resolve(process.env.MYFIN_ROOT ?? join(here, '..', '..'));
+export const DATA_DIR = resolve(process.env.MYFIN_DATA ?? join(ROOT, 'data'));
+export const CACHE_DIR = join(DATA_DIR, 'cache');
+export const SETTINGS_FILE = join(DATA_DIR, 'settings.json');
+export const DEFAULT_EXPORTS_DIR = resolve(process.env.MYFIN_EXPORTS ?? join(ROOT, 'exports'));
+export const WEB_DIST = resolve(process.env.MYFIN_WEB_DIST ?? join(ROOT, 'dist', 'web'));
+
+export function ensureDir(p: string): string {
+  mkdirSync(p, { recursive: true });
+  return p;
+}
