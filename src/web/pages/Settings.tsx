@@ -120,6 +120,7 @@ export function SettingsPage() {
                 <Table.Th>Rok</Table.Th>
                 <Table.Th>Situace</Table.Th>
                 <Table.Th>Jiný základ daně (Kč)</Table.Th>
+                <Table.Th>Zahraniční dividendy</Table.Th>
                 <Table.Th>Přepočet měn</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -150,10 +151,31 @@ export function SettingsPage() {
                         value={p?.otherTaxBase ?? ''}
                         onChange={(v) =>
                           upd((x) => {
-                            x.taxProfiles[y] = { situation: x.taxProfiles[y]?.situation ?? x.defaultSituation, otherTaxBase: v === '' ? undefined : Number(v) };
+                            x.taxProfiles[y] = { ...(x.taxProfiles[y] ?? {}), situation: x.taxProfiles[y]?.situation ?? x.defaultSituation, otherTaxBase: v === '' ? undefined : Number(v) };
                           })
                         }
                       />
+                    </Table.Td>
+                    <Table.Td>
+                      {y < 2021 ? (
+                        <Text size="xs" c="dimmed">
+                          obecný základ (§16a až od 2021)
+                        </Text>
+                      ) : (
+                        <Select
+                          size="xs"
+                          data={[
+                            { value: '16a', label: '§16a – Příloha č. 4 (15 %)' },
+                            { value: 'general', label: 'Obecný základ + Příloha č. 3' },
+                          ]}
+                          value={p?.foreign16a === false ? 'general' : '16a'}
+                          onChange={(v) =>
+                            upd((x) => {
+                              x.taxProfiles[y] = { ...(x.taxProfiles[y] ?? {}), situation: x.taxProfiles[y]?.situation ?? x.defaultSituation, foreign16a: v !== 'general' };
+                            })
+                          }
+                        />
+                      )}
                     </Table.Td>
                     <Table.Td>
                       <Select
@@ -172,7 +194,9 @@ export function SettingsPage() {
             </Table.Tbody>
           </Table>
           <Text size="xs" c="dimmed">
-            „Jiný základ daně“ (např. ze zaměstnání nebo podnikání) slouží jen k odhadu, zda část zisku nespadne do sazby 23 %.
+            „Jiný základ daně“ (např. ze zaměstnání nebo podnikání) slouží k odhadu sazby 15 / 23 % a koeficientu zápočtu v Příloze č. 3. Zdanění
+            zahraničních dividend podle §16a je volitelné – volba platí pro všechny zahraniční dividendy a úroky v daném roce; při nízkých příjmech
+            může být výhodnější obecný základ (uplatní se sleva na poplatníka).
           </Text>
           <Accordion variant="separated">
             <Accordion.Item value="rates">

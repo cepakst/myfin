@@ -12,7 +12,7 @@ export const TREATY_DIVIDEND_RATES: Record<string, number | null> = {
   FR: 0.10,
   NL: 0.10,
   BE: 0.15,
-  LU: 0.15,
+  LU: 0.10,
   AT: 0.10,
   CH: 0.15,
   ES: 0.15,
@@ -22,7 +22,7 @@ export const TREATY_DIVIDEND_RATES: Record<string, number | null> = {
   SE: 0.10,
   NO: 0.15,
   FI: 0.15,
-  PL: 0.10,
+  PL: 0.05,
   SK: 0.15,
   HU: 0.15,
   JP: 0.15,
@@ -52,6 +52,28 @@ export const ISSUER_COUNTRY_BY_ISIN: Record<string, string> = {
 };
 
 export const CZ_DIVIDEND_RATE = 0.15;
+
+/** How to reclaim tax withheld above the treaty rate, per source country */
+export const RECLAIM_INFO: Record<string, string> = {
+  US: 'Předem podepsat W-8BEN u brokera (sníží srážku na 15 %); zpětné vrácení je u USA prakticky nemožné.',
+  DE: 'Žádost o vrácení online přes portál BZSt (Bundeszentralamt für Steuern).',
+  FR: 'Formulář 5000 (potvrzení rezidence) + 5001 (žádost o vrácení).',
+  BE: 'Formulář 276 Div-Aut.',
+  CH: 'Formulář 70 (pro rezidenty ČR) u ESTV.',
+  AT: 'Elektronická předběžná žádost a formulář ZS-RD1 u rakouské finanční správy.',
+  NO: 'Žádost RF-1026 u Skatteetaten.',
+  LU: 'Formulář 901bis.',
+  KR: 'Formulář NTS (žádost o vrácení přeplatku srážkové daně).',
+  JP: 'Formulář 11 (Application for Refund of the Overpaid Withholding Tax).',
+  PL: 'Žádost o vrácení přeplatku (wniosek o stwierdzenie nadpłaty) s certifikátem rezidence.',
+  PT: 'Formulář Modelo 21-RFI.',
+  ES: 'Modelo 210 u Agencia Tributaria.',
+  IE: 'Formulář V2A u Revenue (DWT refund).',
+  CA: 'Formulář NR301 předem u brokera, případně NR7-R pro vrácení.',
+  IT: 'Žádost o vrácení (Modulo per il rimborso) u Agenzia delle Entrate.',
+  DK: 'Online žádost o vrácení u Skattestyrelsen (formulář 06.003).',
+  FI: 'Formulář VK1 (žádost o vrácení srážkové daně).',
+};
 
 export function treatyRate(country: string, overrides: Record<string, number> = {}): number | null {
   if (country in overrides) return overrides[country];

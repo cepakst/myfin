@@ -70,6 +70,11 @@ export function TaxesPage({ s }: { s: Snapshot }) {
           <Badge size="lg" variant="outline">
             kurz: {fxY?.method === 'DAILY' ? 'denní ČNB' : 'jednotný'}
           </Badge>
+          {sum.foreignDividendsCzk > 0 && (
+            <Badge size="lg" variant="outline" color="grape">
+              dividendy: {sum.use16a ? '§16a (Příloha č. 4)' : 'obecný základ (Příloha č. 3)'}
+            </Badge>
+          )}
         </Group>
         {sum.mustFile != null && (
           <Badge size="lg" color={sum.mustFile ? 'orange' : 'teal'}>
@@ -89,7 +94,11 @@ export function TaxesPage({ s }: { s: Snapshot }) {
         <Stat label="Příjmy z prodeje CP" value={czk(sec.totalProceedsCzk)} sub={`z toho časový test ${czk(sec.timeTestProceedsCzk)}`} />
         <Stat label="Pro limit 100 000 Kč" value={czk(sec.limitProceedsCzk)} sub={sec.smallSalesExempt ? 'v limitu – osvobozeno' : 'limit překročen'} color={sec.smallSalesExempt ? 'teal' : 'orange'} />
         <Stat label="Základ daně §10" value={czk(sec.taxable.baseCzk)} sub={`zisky ${czk(sec.taxable.gainsCzk)} / ztráty ${czk(-sec.taxable.lossesCzk)}`} />
-        <Stat label="Odhad daně celkem" value={czk(sum.estimatedTaxTotalCzk)} sub={`CP ${czk(sum.estimatedTaxSecuritiesCzk)} · dividendy ${czk(sum.estimatedTaxDividendsCzk)}`} />
+        <Stat
+          label="Odhad daně celkem"
+          value={czk(sum.estimatedTaxTotalCzk)}
+          sub={`CP ${czk(sum.estimatedTaxSecuritiesCzk)} · dividendy ${czk(sum.estimatedTaxDividendsCzk)}${sum.year >= 2021 && sum.foreignDividendsCzk > 0 ? ` (${sum.use16a ? 'bez §16a' : 's §16a'} ${czk(sum.use16a ? sum.estimatedTaxDividendsGeneralCzk : sum.estimatedTaxDividends16aCzk)})` : ''}`}
+        />
       </SimpleGrid>
       <Text size="sm" c="dimmed">
         Hodnoty k přepsání do daňového přiznání (tlačítkem zkopírujete celé číslo v Kč). Výpočet: FIFO, výdaje = pořizovací cena + poplatky při nákupu i prodeji, přepočet {fxY?.method === 'DAILY' ? 'denním kurzem ČNB' : 'jednotným kurzem'}.

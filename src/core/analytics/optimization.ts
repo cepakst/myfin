@@ -1,6 +1,6 @@
 import type { DividendPayment } from '../tax/dividends.js';
 import { SMALL_SALES_LIMIT, type SecuritiesYearReport } from '../tax/securities.js';
-import { countryName } from '../tax/treaties.js';
+import { countryName, RECLAIM_INFO } from '../tax/treaties.js';
 import { addDays, todayIso } from '../util.js';
 import type { LotView } from './portfolio.js';
 
@@ -148,7 +148,7 @@ export function buildTips(opts: {
       id: 'time-tested',
       severity: 'success',
       title: 'Pozice se splněným časovým testem',
-      text: `${tested.length} lotů již splnilo časový test – jejich prodej je osvobozen (nerealizovaný zisk ${fmt(gain)}). Při FIFO se prodávají nejstarší kusy jako první, takže dílčí prodej sáhne nejdřív na ně. Od roku 2025 platí limit osvobození 40 mil. Kč ročně.`,
+      text: `${tested.length} lotů již splnilo časový test – jejich prodej je osvobozen (nerealizovaný zisk ${fmt(gain)}). Při FIFO se prodávají nejstarší kusy jako první, takže dílčí prodej sáhne nejdřív na ně. Prodeje nad 5 mil. Kč osvobozených příjmů je nutné oznámit správci daně (§38v).`,
       amountCzk: gain,
       items: tested.map((l) => item(l)),
     });
@@ -166,7 +166,10 @@ export function buildTips(opts: {
       text: `Z dividend bylo sraženo více, než umožňují smlouvy o zamezení dvojího zdanění – celkem ${fmt(total)} (${[...reclaim]
         .sort((a, b) => b[1] - a[1])
         .map(([c, v]) => `${countryName(c)} ${fmt(v)}`)
-        .join(', ')}). Tento rozdíl nelze započíst v ČR; lze o něj žádat zahraniční správce daně (obvykle lhůta 2–5 let, nutné potvrzení o daňovém domicilu). U malých částek se to často nevyplatí. Do budoucna zvažte ETF s domicilem v Irsku.`,
+        .join(', ')}). Tento rozdíl nelze započíst v ČR; lze o něj žádat zahraniční správce daně (obvykle lhůta 2–5 let, nutné potvrzení o daňovém domicilu). U malých částek se to často nevyplatí. Do budoucna zvažte ETF s domicilem v Irsku.${[...reclaim.keys()]
+        .filter((c) => RECLAIM_INFO[c])
+        .map((c) => ` ${countryName(c)}: ${RECLAIM_INFO[c]}`)
+        .join('')}`,
       amountCzk: total,
     });
   }

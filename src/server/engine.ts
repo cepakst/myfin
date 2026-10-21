@@ -10,7 +10,7 @@ import { buildLedger } from '../core/parsers/index.js';
 import { profileFor, type Settings } from '../core/settings.js';
 import { dapDividends, dapSecurities, type DapBlock } from '../core/tax/dap.js';
 import { buildDividendPayments, dividendYearReport, type DividendPayment, type DividendYearReport } from '../core/tax/dividends.js';
-import { securitiesYearReport, type SecuritiesYearReport } from '../core/tax/securities.js';
+import { highRateThreshold, securitiesYearReport, type SecuritiesYearReport } from '../core/tax/securities.js';
 import { yearTaxSummary, type YearTaxSummary } from '../core/tax/summary.js';
 import type { CashEvent, Instrument, Ledger, Trade } from '../core/types.js';
 import { todayIso } from '../core/util.js';
@@ -196,7 +196,7 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
     const divReports = years.map((y) => dividendYearReport(dividends, y));
     const otherCapital = new Map<number, number>();
     for (const c of ledger.cash) {
-      // positive interest without final withholding (XTB interest is taxed at source)
+      // positive interest without final withholding (XTB withholds 15 % on free-funds interest – verified by INTEREST_TAX rows)
       if (c.kind === 'INTEREST' && c.amount > 0 && c.broker !== 'XTB') {
         const y = Number(c.date.slice(0, 4));
         otherCapital.set(y, (otherCapital.get(y) ?? 0) + taxConv(c.amount, c.currency, c.date));
@@ -223,7 +223,7 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
       report: secReports[curYearIdx],
       dividends,
       fxComparison: fxComparison.filter((c) => c.year >= lastYear - 1),
-      taxRate: profileFor(settings, lastYear).otherTaxBase && (profileFor(settings, lastYear).otherTaxBase ?? 0) > 1_600_000 ? 0.23 : 0.15,
+      taxRate: (profileFor(settings, lastYear).otherTaxBase ?? 0) > highRateThreshold(lastYear) ? 0.23 : 0.15,
       today,
     });
 
@@ -258,7 +258,13 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
       dividends,
       dividendYears: divReports.map(({ payments: _p, ...rest }) => rest),
       taxSummaries,
-      dap: years.map((y, i) => ({ year: y, blocks: [dapSecurities(secReports[i]), ...dapDividends(divReports[i], y)] })),
+      dap: years.map((y, i) => ({
+        year: y,
+        blocks: [
+          dapSecurities(secReports[i]),
+          ...dapDividends(divReports[i], y, { use16a: taxSummaries[i].use16a, generalBaseCzk: taxSummaries[i].generalBaseCzk, otherCapitalCzk: otherCapital.get(y) ?? 0 }),
+        ],
+      })),
       insights,
       tips,
       fxComparison,

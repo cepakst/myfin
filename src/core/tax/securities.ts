@@ -1,9 +1,16 @@
 import type { Realization } from '../fifo.js';
 
-/** §4(1)(w) – yearly limit of gross proceeds from securities sales that are exempt */
+/** §4(1)(t) – yearly limit of gross proceeds from securities sales that are exempt */
 export const SMALL_SALES_LIMIT = 100_000;
-/** §4(1)(x) cap on time-test exempt income from 2025 */
-export const EXEMPT_CAP_FROM_2025 = 40_000_000;
+/** §4(1)(u) cap on time-test exempt income – applied to securities only in tax year 2025 */
+export const EXEMPT_CAP_2025 = 40_000_000;
+
+export function exemptCapApplies(year: number): boolean {
+  return year === 2025;
+}
+
+/** §38v – exempt income above this amount must be reported to the tax authority */
+export const EXEMPT_REPORTING_LIMIT = 5_000_000;
 
 /** Threshold (36× / 48× average wage) above which the 23 % rate applies */
 export const HIGH_RATE_THRESHOLD: Record<number, number> = {
@@ -53,6 +60,8 @@ export interface SecuritiesYearReport {
   exemptGainCzk: number;
   /** Losses from exempt sales – cannot be used */
   exemptLossCzk: number;
+  /** Largest single exempt sale (time test) – §38v reporting if above 5 M */
+  largestExemptSaleCzk: number;
 }
 
 export function securitiesYearReport(all: Realization[], year: number): SecuritiesYearReport {
@@ -63,7 +72,7 @@ export function securitiesYearReport(all: Realization[], year: number): Securiti
   const timeTestProceedsCzk = tt.reduce((s, r) => s + r.proceedsCzk, 0);
   const limitProceedsCzk = rest.reduce((s, r) => s + r.proceedsCzk, 0);
   const smallSalesExempt = limitProceedsCzk <= SMALL_SALES_LIMIT;
-  const capExcessCzk = year >= 2025 ? Math.max(0, timeTestProceedsCzk - EXEMPT_CAP_FROM_2025) : 0;
+  const capExcessCzk = exemptCapApplies(year) ? Math.max(0, timeTestProceedsCzk - EXEMPT_CAP_2025) : 0;
 
   const taxableRs = smallSalesExempt ? [] : rest;
   let incomeCzk = 0;
@@ -88,6 +97,8 @@ export function securitiesYearReport(all: Realization[], year: number): Securiti
   }
   const resultCzk = incomeCzk - expensesCzk;
   const exempt = smallSalesExempt ? rs : tt;
+  const bySale = new Map<string, number>();
+  for (const r of tt) bySale.set(r.tradeId, (bySale.get(r.tradeId) ?? 0) + r.proceedsCzk);
   return {
     year,
     realizations: rs,
@@ -100,5 +111,6 @@ export function securitiesYearReport(all: Realization[], year: number): Securiti
     taxable: { incomeCzk, expensesCzk, gainsCzk, lossesCzk, resultCzk, baseCzk: Math.max(0, resultCzk), count: taxableRs.length },
     exemptGainCzk: exempt.filter((r) => r.gainCzk > 0).reduce((s, r) => s + r.gainCzk, 0),
     exemptLossCzk: exempt.filter((r) => r.gainCzk < 0).reduce((s, r) => s - r.gainCzk, 0),
+    largestExemptSaleCzk: Math.max(0, ...bySale.values()),
   };
 }

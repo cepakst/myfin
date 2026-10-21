@@ -75,6 +75,13 @@ export async function createServer() {
         res.header('Cache-Control', /[\\/]assets[\\/]/.test(path) ? 'public, max-age=31536000, immutable' : 'no-cache');
       },
     });
+    app.addHook('onSend', async (req, reply) => {
+      if (!req.url.startsWith('/api/'))
+        reply.header(
+          'Content-Security-Policy',
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        );
+    });
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/') || req.url.startsWith('/assets/')) return reply.code(404).send({ error: 'Not found' });
       return reply.header('Cache-Control', 'no-cache').sendFile('index.html');
@@ -84,9 +91,9 @@ export async function createServer() {
   return {
     app,
     start: async (port: number) => {
-      await app.listen({ port, host: '127.0.0.1' });
+      const address = await app.listen({ port, host: '127.0.0.1' });
       recompute();
-      return `http://127.0.0.1:${port}`;
+      return address;
     },
   };
 }

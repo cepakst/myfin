@@ -51,8 +51,16 @@ export interface FxConfig {
 /**
  * Official "jednotný kurz" published by GFŘ (CZK per 1 unit).
  * Used in preference to the computed value whenever available.
+ * 2025 USD/GBP are left to the computed value until verified against the GFŘ publication.
  */
-export const OFFICIAL_UNIFIED_RATES: Record<number, Record<string, number>> = {};
+export const OFFICIAL_UNIFIED_RATES: Record<number, Record<string, number>> = {
+  2020: { EUR: 26.5, USD: 23.14, GBP: 29.8, SEK: 2.53, DKK: 3.55, CHF: 24.74, PLN: 5.93 },
+  2021: { EUR: 25.65, USD: 21.72, GBP: 29.88, SEK: 2.53, DKK: 3.45, CHF: 23.76, PLN: 5.61 },
+  2022: { EUR: 24.54, USD: 23.41, GBP: 28.72, SEK: 2.3, DKK: 3.3, CHF: 24.51, PLN: 5.24 },
+  2023: { EUR: 23.97, USD: 22.14, GBP: 27.59, SEK: 2.09, DKK: 3.22, CHF: 24.69, PLN: 5.31 },
+  2024: { EUR: 25.16, USD: 23.28, GBP: 29.78, SEK: 2.2, DKK: 3.37, CHF: 26.4, PLN: 5.85 },
+  2025: { EUR: 24.66, SEK: 2.23, DKK: 3.3, CHF: 26.33, PLN: 5.82 },
+};
 
 export class FxRates {
   private series = new Map<string, { dates: string[]; rates: number[] }>();

@@ -6,6 +6,8 @@ export interface YearTaxProfile {
   situation: TaxSituation;
   /** Other tax base (employment, business) in CZK – used for the 15 % / 23 % bracket estimate */
   otherTaxBase?: number;
+  /** Tax foreign dividends in the separate §16a base (Příloha č. 4); default true from 2021 */
+  foreign16a?: boolean;
 }
 
 export interface Settings {
@@ -49,6 +51,11 @@ export function mergeSettings(raw: Partial<Settings> | undefined): Settings {
 
 export function profileFor(s: Settings, year: number): YearTaxProfile {
   return s.taxProfiles[year] ?? { situation: s.defaultSituation };
+}
+
+/** §16a separate tax base exists from 2021 and is elective */
+export function uses16a(s: Settings, year: number): boolean {
+  return year >= 2021 && (profileFor(s, year).foreign16a ?? true);
 }
 
 export const SITUATION_LABELS: Record<TaxSituation, string> = {

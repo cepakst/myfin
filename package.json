@@ -4,6 +4,8 @@
   "private": true,
   "description": "My Finance – lokální aplikace pro přehled investic, výnosů a daní (Degiro, XTB)",
   "type": "module",
+  "main": "dist/electron/main.js",
+  "author": "cepakst",
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "tsx watch src/server/main.ts",
@@ -11,10 +13,21 @@
     "build": "npm run build:web && npm run build:server",
     "build:web": "vite build",
     "build:server": "esbuild src/server/main.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/server/main.js",
+    "build:electron": "esbuild src/electron/main.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/electron/main.js",
     "start": "node dist/server/main.js",
+    "electron": "npm run build && npm run build:electron && electron .",
+    "dist:win": "npm run build && npm run build:electron && electron-builder --win nsis",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "build": {
+    "appId": "cz.cepakst.myfin",
+    "productName": "My finance",
+    "directories": { "output": "dist-electron" },
+    "files": ["dist/web/**", "dist/electron/**", "package.json"],
+    "win": { "target": "nsis" },
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "shortcutName": "My finance" }
   },
   "engines": {
     "node": ">=22"
@@ -42,6 +55,8 @@
     "concurrently": "^10.0.6",
     "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.6",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "mantine-datatable": "^9.4.0",
     "postcss": "^8.5.31",
@@ -54,5 +69,10 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
+  },
+  "allowScripts": {
+    "electron@45.0.0": true,
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.28.2": true
   }
 }

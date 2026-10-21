@@ -62,13 +62,16 @@ describe('securities §10 report', () => {
     expect(r.taxable.baseCzk).toBe(0);
   });
 
-  it('applies the 40 M cap on time-tested proceeds from 2025', () => {
+  it('applies the 40 M cap on time-tested proceeds only in 2025', () => {
     const r = securitiesYearReport([real('2025-03-01', 50_000_000, 10_000_000, true)], 2025);
     expect(r.capExcessCzk).toBe(10_000_000);
     expect(r.taxable.incomeCzk).toBeCloseTo(10_000_000);
     expect(r.taxable.baseCzk).toBeCloseTo(8_000_000);
     const r24 = securitiesYearReport([real('2024-03-01', 50_000_000, 10_000_000, true)], 2024);
     expect(r24.capExcessCzk).toBe(0);
+    const r26 = securitiesYearReport([real('2026-03-01', 50_000_000, 10_000_000, true)], 2026);
+    expect(r26.capExcessCzk).toBe(0);
+    expect(r26.taxable.baseCzk).toBe(0);
   });
 });
 
