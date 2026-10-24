@@ -6,17 +6,29 @@ import Fastify from 'fastify';
 import { detectFileKind } from '../core/parsers/index.js';
 import { mergeSettings, type Settings } from '../core/settings.js';
 import { computeSnapshot, instrumentDetail, state } from './engine.js';
-import { DEFAULT_EXPORTS_DIR, ensureDir, WEB_DIST } from './paths.js';
+import { DEFAULT_EXPORTS_DIR, DEMO_SETTINGS_FILE, ensureDir, WEB_DIST } from './paths.js';
 import { loadSettings, saveSettings } from './store.js';
 
 export async function createServer() {
+  // `settings` = the user's settings (incl. the demo flag); demo mode edits a separate settings file
   let settings = loadSettings();
+  let demoSettings = loadSettings(DEMO_SETTINGS_FILE);
+  const active = () => (settings.demo ? demoSettings : settings);
   const app = Fastify({ logger: false, bodyLimit: 50 * 1024 * 1024 });
   await app.register(fastifyMultipart, { limits: { fileSize: 100 * 1024 * 1024, files: 10 } });
 
-  const recompute = (refreshMarket = false) => {
-    if (state.status === 'loading') return false;
-    void computeSnapshot(settings, { refreshMarket });
+  // a change requested during a running computation (e.g. switching to demo data) is applied right after it
+  let pending: { refreshMarket: boolean } | null = null;
+  const recompute = (refreshMarket = false): boolean => {
+    if (state.status === 'loading') {
+      pending = { refreshMarket: refreshMarket || !!pending?.refreshMarket };
+      return false;
+    }
+    void computeSnapshot(active(), { refreshMarket, demo: !!settings.demo }).finally(() => {
+      const next = pending;
+      pending = null;
+      if (next) recompute(next.refreshMarket);
+    });
     return true;
   };
 
@@ -33,13 +45,30 @@ export async function createServer() {
     return d;
   });
 
-  app.get('/api/settings', async () => ({ settings, defaultExportsDir: DEFAULT_EXPORTS_DIR }));
+  app.get('/api/settings', async () => ({ settings: active(), defaultExportsDir: DEFAULT_EXPORTS_DIR, demo: !!settings.demo }));
 
   app.put<{ Body: Partial<Settings> }>('/api/settings', async (req) => {
-    settings = mergeSettings({ ...settings, ...req.body });
-    saveSettings(settings);
+    // the demo flag is switched only via /api/demo; demo settings never carry an exports folder
+    const { demo: _ignored, ...body } = req.body ?? {};
+    if (settings.demo) {
+      demoSettings = mergeSettings({ ...demoSettings, ...body, exportsDir: undefined, demo: undefined });
+      saveSettings(demoSettings, DEMO_SETTINGS_FILE);
+    } else {
+      settings = mergeSettings({ ...settings, ...body, demo: settings.demo });
+      saveSettings(settings);
+    }
     recompute();
-    return { settings };
+    return { settings: active() };
+  });
+
+  app.put<{ Body: { enabled?: boolean } }>('/api/demo', async (req) => {
+    const enabled = req.body?.enabled === true;
+    if (enabled !== !!settings.demo) {
+      settings = mergeSettings({ ...settings, demo: enabled || undefined });
+      saveSettings(settings);
+      recompute();
+    }
+    return { demo: enabled, settings: active() };
   });
 
   app.post<{ Body: { refreshMarket?: boolean } | undefined }>('/api/reload', async (req) => ({ started: recompute(!!req.body?.refreshMarket) }));
@@ -64,7 +93,8 @@ export async function createServer() {
       writeFileSync(join(sub, fname), buf);
       saved.push({ file: fname, kind });
     }
-    recompute();
+    // uploads always go to the user's exports; the demo view is not affected by them
+    if (!settings.demo) recompute();
     return { saved };
   });
 

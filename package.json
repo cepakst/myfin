@@ -18,6 +18,7 @@
     "electron": "npm run build && npm run build:electron && electron .",
     "dist:win": "npm run build && npm run build:electron && electron-builder --win nsis",
     "dist:mac": "npm run build && npm run build:electron && electron-builder --mac dmg zip --arm64 --x64",
+    "demo:generate": "tsx scripts/generate-demo.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -32,6 +33,7 @@
     "files": [
       "dist/web/**",
       "dist/electron/**",
+      "demo/**",
       "package.json"
     ],
     "win": {

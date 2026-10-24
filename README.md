@@ -49,6 +49,14 @@ Nainstalovaná aplikace ukládá exporty, nastavení a cache do `%APPDATA%\myfin
 
 Nový export stejného typu nahradí předchozí. Starý se přesune do `exports/_archiv`.
 
+### Demo data
+
+Aplikace obsahuje ukázkové exporty ve složce `demo/`: smyšlené portfolio u Degiro (EUR) a XTB (CZK) od roku 2023. Obchody jsou na skutečných instrumentech (Apple, NVIDIA včetně splitu 10:1, ČEZ, Komerční banka, ETF VWCE…) za skutečné historické ceny. Obsahují dividendy z několika zemí, prodeje před časovým testem i po něm a ztrátový prodej.
+
+- Přepnutí: **Nastavení a data → Zdroj dat → Demo data** (nebo tlačítko na Přehledu, dokud nemáte nahrané exporty). V hlavičce se pak zobrazí štítek **DEMO**.
+- Demo režim má vlastní nastavení (`data/settings.demo.json`), takže se v něm neukáží vaše osobní údaje a vaše nastavení zůstane beze změny. Nahrané exporty se vždy uloží mezi vaše vlastní.
+- Přegenerování (stáhne aktuální ceny z Yahoo Finance): `npm run demo:generate [YYYY-MM-DD]`.
+
 ## Soukromí
 
 - Všechna data zůstávají v počítači, ve složkách `exports/` a `data/` (u nainstalované aplikace v `%APPDATA%\myfin`, na macOS v `~/Library/Application Support/myfin`). Obě složky jsou v `.gitignore`.

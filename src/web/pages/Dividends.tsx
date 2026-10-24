@@ -81,7 +81,7 @@ export function DividendsPage({ s }: { s: Snapshot }) {
         <YearSelect years={s.years} value={year} onChange={setYear} />
       </Group>
       <SimpleGrid cols={{ base: 2, md: 4 }}>
-        <Stat label="Zahraniční dividendy hrubě" value={czk(rep.foreign.grossCzk)} sub={`${pays.length} výplat`} hint="Hrubé zahraniční dividendy před srážkovou daní, přepočtené kurzem zvoleným pro daňové účely. Tato částka se uvádí v přiznání." />
+        <Stat label="Zahraniční dividendy hrubě" value={czk(rep.foreign.grossCzk)} sub={`${pays.filter((p) => !p.finalTaxed).length} výplat`} hint="Hrubé zahraniční dividendy před srážkovou daní, přepočtené kurzem zvoleným pro daňové účely. Tato částka se uvádí v přiznání." />
         <Stat
           label="Sražená daň v zahraničí"
           value={czk(rep.foreign.withheldCzk)}

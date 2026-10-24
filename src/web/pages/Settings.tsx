@@ -1,4 +1,4 @@
-import { Accordion, Alert, Anchor, Badge, Button, Group, List, NumberInput, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Accordion, Alert, Anchor, Badge, Button, Group, List, NumberInput, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
 import { IconCloudDownload, IconDeviceFloppy, IconUpload } from '@tabler/icons-react';
@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { api, useSnapshot, type Settings } from '../api';
 import { Section } from '../components';
 import { DataGrid } from '../DataGrid';
+import { useSetDemo } from '../demo';
 import { SITUATIONS } from '../format';
 import { MARKET_STATUS_COLOR, MARKET_STATUS_LABEL, MARKET_STATUS_ORDER, marketStatus, missingMarketData } from '../marketStatus';
 
@@ -17,6 +18,7 @@ export function SettingsPage() {
   const snap = useSnapshot();
   const [st, setSt] = useState<Settings | null>(null);
   const [uploading, setUploading] = useState(false);
+  const setDemo = useSetDemo();
   useEffect(() => {
     if (sq.data) setSt(structuredClone(sq.data.settings));
   }, [sq.data]);
@@ -36,6 +38,7 @@ export function SettingsPage() {
   };
   const instruments = s?.instruments ?? [];
   const missing = missingMarketData(instruments);
+  const demo = sq.data.demo;
 
   return (
     <Stack>
@@ -46,13 +49,42 @@ export function SettingsPage() {
         </Button>
       </Group>
 
+      <Section title="Zdroj dat">
+        <Stack gap="xs">
+          <SegmentedControl
+            maw={420}
+            data={[
+              { value: 'real', label: 'Moje exporty' },
+              { value: 'demo', label: 'Demo data' },
+            ]}
+            value={demo ? 'demo' : 'real'}
+            onChange={(v) => void setDemo(v === 'demo')}
+            data-testid="data-source"
+          />
+          <Text size="sm" c="dimmed">
+            Demo data jsou smyšlené portfolio (Degiro a XTB, od roku 2023) s obchody na skutečných instrumentech za skutečné historické ceny. Jsou součástí aplikace a vaše
+            exporty ani nastavení neovlivní – daňová situace, symboly a další volby se v demo režimu ukládají zvlášť.
+          </Text>
+          {demo && (
+            <Alert color="orange" title="Zobrazena demo data">
+              Výsledky ve všech sekcích pocházejí z ukázkových exportů. Nahrané exporty se uloží do vaší složky a zobrazí se po přepnutí na „Moje exporty“.
+            </Alert>
+          )}
+        </Stack>
+      </Section>
+
       <Section title="Exporty od brokerů">
         <Stack>
           <TextInput
             label="Složka s exporty"
-            description={`Výchozí: ${sq.data.defaultExportsDir}. Načítají se soubory .csv (Degiro Transactions + Account) a .xlsx/.zip (XTB) včetně podsložek.`}
+            description={
+              demo
+                ? 'V demo režimu se exporty načítají z ukázkových dat aplikace. Složku pro vlastní exporty změníte po přepnutí na „Moje exporty“.'
+                : `Výchozí: ${sq.data.defaultExportsDir}. Načítají se soubory .csv (Degiro Transactions + Account) a .xlsx/.zip (XTB) včetně podsložek.`
+            }
             placeholder={sq.data.defaultExportsDir}
             value={st.exportsDir ?? ''}
+            disabled={demo}
             onChange={(e) => upd((x) => (x.exportsDir = e.currentTarget.value || undefined))}
           />
           <Dropzone

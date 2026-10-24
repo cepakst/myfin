@@ -2,8 +2,8 @@ const czkFmt = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 });
 const numFmt = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 4 });
 const num2Fmt = new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export const czk = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? '–' : `${czkFmt.format(Math.round(n))} Kč`);
-export const czkRaw = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? '' : String(Math.round(n)));
+export const czk = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? '–' : `${czkFmt.format(Math.round(n) || 0)} Kč`);
+export const czkRaw = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? '' : String(Math.round(n) || 0));
 export const num = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? '–' : numFmt.format(n));
 export const num2 = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? '–' : num2Fmt.format(n));
 export const pct = (n: number | null | undefined, digits = 1) =>

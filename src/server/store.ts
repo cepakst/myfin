@@ -3,18 +3,18 @@ import { join } from 'node:path';
 import { mergeSettings, type Settings } from '../core/settings.js';
 import { DATA_DIR, ensureDir, SETTINGS_FILE } from './paths.js';
 
-export function loadSettings(): Settings {
+export function loadSettings(file = SETTINGS_FILE): Settings {
   try {
-    if (existsSync(SETTINGS_FILE)) return mergeSettings(JSON.parse(readFileSync(SETTINGS_FILE, 'utf-8')));
+    if (existsSync(file)) return mergeSettings(JSON.parse(readFileSync(file, 'utf-8')));
   } catch {
     /* fall through to defaults */
   }
   return mergeSettings(undefined);
 }
 
-export function saveSettings(s: Settings): void {
+export function saveSettings(s: Settings, file = SETTINGS_FILE): void {
   ensureDir(DATA_DIR);
-  writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2));
+  writeFileSync(file, JSON.stringify(s, null, 2));
 }
 
 const EXPORT_EXT = /\.(csv|xlsx|zip)$/i;

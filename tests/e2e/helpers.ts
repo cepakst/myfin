@@ -1,9 +1,9 @@
 import { expect, type Page } from '@playwright/test';
 
 /** The snapshot endpoint returns 503 while computing; wait until the engine is ready (or failed). */
-export async function waitForSnapshot(page: Page) {
+export async function waitForSnapshot(page: Page, timeout = 45_000) {
   await expect
-    .poll(async () => (await (await page.request.get('/api/status')).json()).status, { timeout: 45_000 })
+    .poll(async () => (await (await page.request.get('/api/status')).json()).status, { timeout })
     .toMatch(/ready|error/);
   const status = await (await page.request.get('/api/status')).json();
   expect(status.error ?? null).toBeNull();

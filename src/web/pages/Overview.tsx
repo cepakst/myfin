@@ -1,11 +1,13 @@
-import { Alert, Anchor, Badge, Grid, Group, List, SimpleGrid, Stack, Text } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Grid, Group, List, SimpleGrid, Stack, Text } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import type { Snapshot } from '../api';
 import { Chart, Section, Stat, tooltipCzk } from '../components';
+import { useSetDemo } from '../demo';
 import { czk, date, pct, signColor } from '../format';
 import { missingMarketData } from '../marketStatus';
 
 export function OverviewPage({ s }: { s: Snapshot }) {
+  const setDemo = useSetDemo();
   const t = s.performance.total;
   const daily = s.performance.daily;
   const fees = s.insights.total.tradeFeesCzk + s.insights.total.accountFeesCzk;
@@ -21,6 +23,22 @@ export function OverviewPage({ s }: { s: Snapshot }) {
 
   return (
     <Stack>
+      {!s.demo && s.files.length === 0 && (
+        <Alert color="blue" title="Zatím tu nejsou žádné exporty">
+          <Group justify="space-between">
+            <Text size="sm">
+              Nahrajte exporty od brokerů v{' '}
+              <Anchor component={Link} to="/nastaveni">
+                Nastavení
+              </Anchor>
+              , nebo si aplikaci nejdřív vyzkoušejte na ukázkových datech.
+            </Text>
+            <Button variant="light" onClick={() => setDemo(true)}>
+              Zobrazit demo data
+            </Button>
+          </Group>
+        </Alert>
+      )}
       <SimpleGrid cols={{ base: 2, md: 4 }}>
         <Stat label="Hodnota portfolia" value={czk(t.value)} sub={`k ${date(s.today)} · ${open.length} pozic`} />
         <Stat label="Celkový zisk" value={czk(t.pnl)} color={signColor(t.pnl)} sub={`čistě investováno ${czk(t.invested)}`} />

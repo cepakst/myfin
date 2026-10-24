@@ -16,6 +16,7 @@ function configurePaths() {
     process.env.MYFIN_DATA ??= join(userDir, 'data');
     process.env.MYFIN_EXPORTS ??= join(userDir, 'exports');
     process.env.MYFIN_WEB_DIST ??= join(app.getAppPath(), 'dist', 'web');
+    process.env.MYFIN_DEMO_DIR ??= join(app.getAppPath(), 'demo');
   }
   // Unpackaged: paths.ts resolves the project root (data/ and exports/ shared with start.bat / start.sh).
 }

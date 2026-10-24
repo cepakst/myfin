@@ -25,7 +25,8 @@ export const api = {
   status: () => json<Status>('/api/status'),
   snapshot: () => json<Snapshot>('/api/snapshot'),
   instrument: (id: string) => json<InstrumentDetail>(`/api/instrument/${encodeURIComponent(id)}`),
-  settings: () => json<{ settings: Settings; defaultExportsDir: string }>('/api/settings'),
+  settings: () => json<{ settings: Settings; defaultExportsDir: string; demo: boolean }>('/api/settings'),
+  setDemo: (enabled: boolean) => json<{ demo: boolean; settings: Settings }>('/api/demo', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) }),
   saveSettings: (s: Partial<Settings>) => json<{ settings: Settings }>('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }),
   reload: (refreshMarket = false) => json<{ started: boolean }>('/api/reload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshMarket }) }),
   upload: (files: File[]) => {

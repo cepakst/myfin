@@ -1,0 +1,1 @@
+Pro potreby dema aplikace vytvor sample degiro/xtb exporty. Exporty by mely byt srze 3 roky a ilustrovat realne vypadajici obchody na realnych intrumentech. Tyto data by mely byt soucasti aplikace a melo by byt mozne na ne prepnout v nastaveni z realnych exportu. V headeru aplikace zobraze kartu DEMO, aby bylo jasne ze jsou nactene demo data.

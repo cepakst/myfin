@@ -8,6 +8,9 @@ data/
 *.zip
 # Synthetic E2E fixtures only - never put real exports here
 !tests/e2e/fixtures/**/*.csv
+# Generated demo data (fictitious portfolio, scripts/generate-demo.ts) - never put real exports here
+!demo/degiro/*.csv
+!demo/xtb/*.xlsx
 
 # Python
 __pycache__/

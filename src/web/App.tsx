@@ -14,6 +14,7 @@ import {
 } from '@tabler/icons-react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { api, useSnapshot, useStatus } from './api';
+import { DemoBadge } from './demo';
 import { DividendsPage } from './pages/Dividends';
 import { InsightsPage } from './pages/Insights';
 import { InstrumentPage } from './pages/Instrument';
@@ -88,6 +89,7 @@ export function App() {
           <Group>
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <Title order={3}>My finance</Title>
+            {snap.data?.demo && <DemoBadge />}
           </Group>
           <Group gap="xs">
             {loading && (

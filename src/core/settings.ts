@@ -13,6 +13,8 @@ export interface YearTaxProfile {
 
 export interface Settings {
   exportsDir?: string;
+  /** Show the bundled demo data instead of the user's exports (stored in the main settings file only) */
+  demo?: boolean;
   fx: FxConfig;
   /** Tax profile per year; years not listed use `defaultSituation` */
   taxProfiles: Record<number, YearTaxProfile>;

@@ -16,7 +16,7 @@ import type { CashEvent, Instrument, Ledger, Trade } from '../core/types.js';
 import { todayIso } from '../core/util.js';
 import { loadCnbFixings } from './cnb.js';
 import { MarketData, type SymbolInfo } from './market.js';
-import { DEFAULT_EXPORTS_DIR } from './paths.js';
+import { DEFAULT_EXPORTS_DIR, DEMO_DIR } from './paths.js';
 import { listExportFiles } from './store.js';
 
 export interface RealizationView extends Realization {
@@ -35,6 +35,8 @@ export interface FxYearInfo {
 export interface Snapshot {
   generatedAt: string;
   today: string;
+  /** Computed from the bundled demo exports */
+  demo: boolean;
   exportsDir: string;
   files: string[];
   sources: Ledger['sources'];
@@ -177,7 +179,7 @@ function taxScenarios(variants: Map<number, Record<FxMethod, TaxVariant>>, setti
   return out;
 }
 
-export async function computeSnapshot(settings: Settings, opts: { refreshMarket?: boolean } = {}): Promise<void> {
+export async function computeSnapshot(settings: Settings, opts: { refreshMarket?: boolean; demo?: boolean } = {}): Promise<void> {
   state.status = 'loading';
   state.progress = [];
   state.error = undefined;
@@ -186,7 +188,7 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
     if (state.progress.length > 50) state.progress.shift();
   };
   try {
-    const exportsDir = settings.exportsDir || DEFAULT_EXPORTS_DIR;
+    const exportsDir = opts.demo ? DEMO_DIR : settings.exportsDir || DEFAULT_EXPORTS_DIR;
     const files = listExportFiles(exportsDir);
     log(`Načítám ${files.length} souborů z ${exportsDir}`);
     const ledger = await buildLedger(files.map((p) => ({ name: p, data: new Uint8Array(readFileSync(p)) })));
@@ -302,6 +304,7 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
     state.snapshot = {
       generatedAt: new Date().toISOString(),
       today,
+      demo: !!opts.demo,
       exportsDir,
       files,
       sources: ledger.sources,

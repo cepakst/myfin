@@ -107,7 +107,7 @@ export function buildTips(opts: {
     tips.push({
       id: 'small-sales',
       severity: 'success',
-      title: `Volný limit 100 000 Kč: ${fmt(room)}`,
+      title: `Zbývá z limitu 100 000 Kč: ${fmt(room)}`,
       text: `Úhrn příjmů z prodeje CP bez časového testu je letos ${fmt(report.limitProceedsCzk)}. Dokud celkové příjmy (ne zisk!) nepřesáhnou 100 000 Kč, jsou všechny tyto prodeje osvobozené. Hodí se to k realizaci zisku nebo rebalancování. Pozor – překročení limitu i o 1 Kč zdaní všechny prodeje v roce.`,
       amountCzk: room,
       items: winners.slice(0, 15).map((l) => item(l)),
