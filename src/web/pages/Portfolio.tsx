@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import type { Snapshot } from '../api';
 import { DataGrid, type GridColumn } from '../DataGrid';
 import { czk, date, money, num, pct, signColor } from '../format';
+import { G } from '../glossary';
 
 type Lot = Snapshot['lots'][number];
 
@@ -62,10 +63,11 @@ function lotColumns(withName: boolean): GridColumn<Lot>[] {
       : []),
     { accessor: 'broker' as const, title: 'Broker', filterable: true },
     { accessor: 'acqDate' as const, title: 'Nákup', render: (l: Lot) => date(l.acqDate) },
-    { accessor: 'qty' as const, title: 'Kusů', textAlign: 'right' as const, render: (l: Lot) => num(l.qty) },
+    { accessor: 'qty' as const, title: 'Kusů', hint: G.lotQty, textAlign: 'right' as const, render: (l: Lot) => num(l.qty) },
     {
       accessor: 'costCzk' as const,
       title: 'Nákupní cena',
+      hint: G.lotCost,
       textAlign: 'right' as const,
       sortValue: (l: Lot) => l.costCzk + l.feesCzk,
       render: (l: Lot) => (
@@ -74,10 +76,11 @@ function lotColumns(withName: boolean): GridColumn<Lot>[] {
         </Tooltip>
       ),
     },
-    { accessor: 'valueCzk' as const, title: 'Hodnota', textAlign: 'right' as const, render: (l: Lot) => czk(l.valueCzk) },
+    { accessor: 'valueCzk' as const, title: 'Hodnota', hint: G.posValue, textAlign: 'right' as const, render: (l: Lot) => czk(l.valueCzk) },
     {
       accessor: 'unrealizedCzk' as const,
       title: 'Zisk',
+      hint: G.unrealizedPos,
       textAlign: 'right' as const,
       render: (l: Lot) => (
         <Text size="sm" c={signColor(l.unrealizedCzk)}>
@@ -85,7 +88,7 @@ function lotColumns(withName: boolean): GridColumn<Lot>[] {
         </Text>
       ),
     },
-    { accessor: 'timeTestDate' as const, title: 'Časový test', render: (l: Lot) => <TimeTestBadge lot={l} /> },
+    { accessor: 'timeTestDate' as const, title: 'Časový test', hint: G.timeTest, render: (l: Lot) => <TimeTestBadge lot={l} /> },
     {
       accessor: 'origin' as const,
       title: '',
@@ -177,20 +180,22 @@ export function PortfolioPage({ s }: { s: Snapshot }) {
                   </Stack>
                 ),
               },
-              { accessor: 'qty', title: 'Kusů', textAlign: 'right', render: (p) => num(p.qty) },
+              { accessor: 'qty', title: 'Kusů', hint: 'Počet držených kusů (součet otevřených lotů, upraveno o splity).', textAlign: 'right', render: (p) => num(p.qty) },
               {
                 accessor: 'price',
                 title: 'Cena',
+                hint: G.price,
                 textAlign: 'right',
                 sortable: false,
                 render: (p) => <PriceCell price={p.price} currency={p.priceCurrency} source={p.priceSource} priceDate={p.priceDate} />,
               },
-              { accessor: 'costCzk', title: 'Nákupní cena', textAlign: 'right', render: (p) => czk(p.costCzk) },
-              { accessor: 'valueCzk', title: 'Hodnota', textAlign: 'right', render: (p) => czk(p.valueCzk) },
-              { accessor: 'weight', title: 'Váha', textAlign: 'right', render: (p) => pct(p.weight) },
+              { accessor: 'costCzk', title: 'Nákupní cena', hint: G.posCost, textAlign: 'right', render: (p) => czk(p.costCzk) },
+              { accessor: 'valueCzk', title: 'Hodnota', hint: G.posValue, textAlign: 'right', render: (p) => czk(p.valueCzk) },
+              { accessor: 'weight', title: 'Váha', hint: G.weight, textAlign: 'right', render: (p) => pct(p.weight) },
               {
                 accessor: 'unrealizedCzk',
                 title: 'Nerealizovaný zisk',
+                hint: G.unrealizedPos,
                 textAlign: 'right',
                 render: (p) => (
                   <Text size="sm" c={signColor(p.unrealizedCzk)}>
@@ -198,10 +203,11 @@ export function PortfolioPage({ s }: { s: Snapshot }) {
                   </Text>
                 ),
               },
-              { accessor: 'dividendsCzk', title: 'Dividendy', textAlign: 'right', render: (p) => czk(p.dividendsCzk) },
+              { accessor: 'dividendsCzk', title: 'Dividendy', hint: G.posDividends, textAlign: 'right', render: (p) => czk(p.dividendsCzk) },
               {
                 accessor: 'nextTimeTestDate',
                 title: 'Časový test',
+                hint: G.posTimeTest,
                 render: (p) => (
                   <Stack gap={0}>
                     {p.timeTestedQty > 0 && (

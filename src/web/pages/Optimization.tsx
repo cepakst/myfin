@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Snapshot } from '../api';
 import { DataGrid } from '../DataGrid';
 import { czk, date, num, signColor } from '../format';
+import { G } from '../glossary';
 
 export function OptimizationPage({ s }: { s: Snapshot }) {
   return (
@@ -20,7 +21,8 @@ export function OptimizationPage({ s }: { s: Snapshot }) {
                 label={t.title}
                 fz="xs"
                 maxHeight={360}
-                searchPlaceholder="Hledat instrument…"
+                searchPlaceholder="Hledat instrument…"
+
                 idAccessor={(r) => r.lotId ?? r.instrumentId}
                 records={t.items}
                 columns={[
@@ -34,12 +36,13 @@ export function OptimizationPage({ s }: { s: Snapshot }) {
                     ),
                   },
                   { accessor: 'acqDate', title: 'Nákup', render: (r) => date(r.acqDate) },
-                  { accessor: 'qty', title: 'Kusů', textAlign: 'right', render: (r) => num(r.qty) },
-                  { accessor: 'timeTestDate', title: 'Časový test', render: (r) => date(r.timeTestDate) },
-                  { accessor: 'valueCzk', title: 'Hodnota', textAlign: 'right', render: (r) => czk(r.valueCzk) },
+                  { accessor: 'qty', title: 'Kusů', hint: G.lotQty, textAlign: 'right', render: (r) => num(r.qty) },
+                  { accessor: 'timeTestDate', title: 'Časový test', hint: G.timeTestDate, render: (r) => date(r.timeTestDate) },
+                  { accessor: 'valueCzk', title: 'Hodnota', hint: G.optValue, textAlign: 'right', render: (r) => czk(r.valueCzk) },
                   {
                     accessor: 'gainCzk',
                     title: 'Daňový zisk/ztráta',
+                    hint: G.optGain,
                     textAlign: 'right',
                     render: (r) => (
                       <Text size="xs" c={signColor(r.gainCzk)}>

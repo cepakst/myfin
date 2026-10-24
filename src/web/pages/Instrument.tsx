@@ -7,6 +7,7 @@ import { DataGrid } from '../DataGrid';
 import { czk, date, money, num, signColor } from '../format';
 import { LotsTable, priceSourceText } from './Portfolio';
 import { missingMarketData } from '../marketStatus';
+import { G } from '../glossary';
 
 export function InstrumentPage({ s }: { s: Snapshot }) {
   const id = decodeURIComponent(useParams().id ?? '');
@@ -46,9 +47,9 @@ export function InstrumentPage({ s }: { s: Snapshot }) {
       )}
       <SimpleGrid cols={{ base: 2, md: 4 }}>
         <Stat label="Držené kusy" value={num(pos?.qty ?? 0)} sub={pos?.price ? `cena ${pos.priceSource !== 'market' ? '≈ ' : ''}${money(pos.price, pos.priceCurrency)}` : undefined} hint={pos?.price ? priceSourceText(pos.priceSource, pos.priceDate) : undefined} />
-        <Stat label="Hodnota" value={czk(pos?.valueCzk ?? 0)} sub={`nákup ${czk(pos?.costCzk ?? 0)}`} />
-        <Stat label="Nerealizovaný zisk" value={czk(pos?.unrealizedCzk ?? 0)} color={signColor(pos?.unrealizedCzk)} />
-        <Stat label="Realizováno + dividendy" value={czk(realized + divs)} color={signColor(realized + divs)} sub={`obchody ${czk(realized)} · dividendy ${czk(divs)}`} />
+        <Stat label="Hodnota" value={czk(pos?.valueCzk ?? 0)} sub={`nákup ${czk(pos?.costCzk ?? 0)}`} hint={G.instValue} />
+        <Stat label="Nerealizovaný zisk" value={czk(pos?.unrealizedCzk ?? 0)} color={signColor(pos?.unrealizedCzk)} hint={G.unrealizedPos} />
+        <Stat label="Realizováno + dividendy" value={czk(realized + divs)} color={signColor(realized + divs)} sub={`obchody ${czk(realized)} · dividendy ${czk(divs)}`} hint={G.instRealized} />
       </SimpleGrid>
       <Section title={`Cena (${cur}) s nákupy a prodeji`}>
         {d.prices.length === 0 ? (
@@ -93,10 +94,10 @@ export function InstrumentPage({ s }: { s: Snapshot }) {
             columns={[
               { accessor: 'dateTime', title: 'Datum', render: (t) => `${date(t.date)} ${t.dateTime.slice(11, 16)}` },
               { accessor: 'broker', title: 'Broker', filterable: true },
-              { accessor: 'quantity', title: 'Kusů', textAlign: 'right', render: (t) => <Text size="sm" c={t.quantity > 0 ? 'teal' : 'red'}>{num(t.quantity)}</Text> },
-              { accessor: 'price', title: 'Cena', textAlign: 'right', render: (t) => money(t.price, t.currency) },
-              { accessor: 'amount', title: 'Objem', textAlign: 'right', render: (t) => money(t.amount, t.currency) },
-              { accessor: 'fees', title: 'Poplatky', textAlign: 'right', sortable: false, render: (t) => t.fees.map((f) => money(f.amount, f.currency)).join(' + ') || '–' },
+              { accessor: 'quantity', title: 'Kusů', hint: 'Kladné (zeleně) = nákup, záporné (červeně) = prodej.', textAlign: 'right', render: (t) => <Text size="sm" c={t.quantity > 0 ? 'teal' : 'red'}>{num(t.quantity)}</Text> },
+              { accessor: 'price', title: 'Cena', hint: G.unitPrice, textAlign: 'right', render: (t) => money(t.price, t.currency) },
+              { accessor: 'amount', title: 'Objem', hint: G.tradeVolume, textAlign: 'right', render: (t) => money(t.amount, t.currency) },
+              { accessor: 'fees', title: 'Poplatky', hint: G.tradeFeesCol, textAlign: 'right', sortable: false, render: (t) => t.fees.map((f) => money(f.amount, f.currency)).join(' + ') || '–' },
             ]}
           />
         </Tabs.Panel>
@@ -109,10 +110,10 @@ export function InstrumentPage({ s }: { s: Snapshot }) {
             columns={[
               { accessor: 'acqDate', title: 'Nákup', render: (r) => date(r.acqDate) },
               { accessor: 'sellDate', title: 'Prodej', render: (r) => date(r.sellDate) },
-              { accessor: 'qty', title: 'Kusů', textAlign: 'right', render: (r) => num(r.qty) },
-              { accessor: 'proceedsCzk', title: 'Příjem', textAlign: 'right', render: (r) => czk(r.proceedsCzk) },
-              { accessor: 'gainCzk', title: 'Zisk (daňově)', textAlign: 'right', render: (r) => <Text size="sm" c={signColor(r.gainCzk)}>{czk(r.gainCzk)}</Text> },
-              { accessor: 'timeTestPassed', title: 'Časový test', filterable: true, filterValue: (r) => (r.timeTestPassed ? 'splněn' : 'ne'), render: (r) => (r.timeTestPassed ? <Badge color="teal">splněn</Badge> : <Badge color="gray">ne</Badge>) },
+              { accessor: 'qty', title: 'Kusů', hint: G.realQty, textAlign: 'right', render: (r) => num(r.qty) },
+              { accessor: 'proceedsCzk', title: 'Příjem', hint: G.proceedsTax, textAlign: 'right', render: (r) => czk(r.proceedsCzk) },
+              { accessor: 'gainCzk', title: 'Zisk (daňově)', hint: G.gainTax, textAlign: 'right', render: (r) => <Text size="sm" c={signColor(r.gainCzk)}>{czk(r.gainCzk)}</Text> },
+              { accessor: 'timeTestPassed', title: 'Časový test', hint: 'Splněn = mezi nákupem a prodejem uplynuly více než 3 roky, prodej je osvobozen od daně (§4 odst. 1 písm. u ZDP).', filterable: true, filterValue: (r) => (r.timeTestPassed ? 'splněn' : 'ne'), render: (r) => (r.timeTestPassed ? <Badge color="teal">splněn</Badge> : <Badge color="gray">ne</Badge>) },
             ]}
           />
         </Tabs.Panel>
@@ -124,9 +125,9 @@ export function InstrumentPage({ s }: { s: Snapshot }) {
             defaultSort={{ column: 'date', direction: 'desc' }}
             columns={[
               { accessor: 'date', title: 'Datum', render: (p) => date(p.date) },
-              { accessor: 'gross', title: 'Hrubě', textAlign: 'right', render: (p) => money(p.gross, p.currency) },
-              { accessor: 'withheld', title: 'Sraženo', textAlign: 'right', render: (p) => money(p.withheld, p.currency) },
-              { accessor: 'netCzkDaily', title: 'Čistě Kč', textAlign: 'right', render: (p) => czk(p.netCzkDaily) },
+              { accessor: 'gross', title: 'Hrubě', hint: 'Hrubá dividenda před srážkovou daní v měně výplaty.', textAlign: 'right', render: (p) => money(p.gross, p.currency) },
+              { accessor: 'withheld', title: 'Sraženo', hint: 'Daň sražená při výplatě v měně výplaty.', textAlign: 'right', render: (p) => money(p.withheld, p.currency) },
+              { accessor: 'netCzkDaily', title: 'Čistě Kč', hint: G.divNetDaily, textAlign: 'right', render: (p) => czk(p.netCzkDaily) },
             ]}
           />
         </Tabs.Panel>

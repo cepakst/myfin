@@ -5,6 +5,7 @@ import type { Snapshot } from '../api';
 import { Chart, defaultYear, Section, Stat, tooltipCzk, YearSelect } from '../components';
 import { DataGrid } from '../DataGrid';
 import { czk, date, money, pct } from '../format';
+import { G } from '../glossary';
 
 type Pay = Snapshot['dividends'][number];
 
@@ -61,7 +62,7 @@ export function DividendsPage({ s }: { s: Snapshot }) {
 
   return (
     <Stack>
-      <Section title="Dividendy po letech">
+      <Section title="Dividendy po letech" hint={G.divYearsChart}>
         <Chart
           height={240}
           option={{
@@ -112,11 +113,12 @@ export function DividendsPage({ s }: { s: Snapshot }) {
             searchPlaceholder="Hledat stát…"
             columns={[
               { accessor: 'country', title: 'Stát' },
-              { accessor: 'count', title: 'Výplat', textAlign: 'right' },
-              { accessor: 'grossCzk', title: 'Hrubě', textAlign: 'right', render: (c) => czk(c.grossCzk) },
+              { accessor: 'count', title: 'Výplat', hint: G.divCount, textAlign: 'right' },
+              { accessor: 'grossCzk', title: 'Hrubě', hint: G.divGross, textAlign: 'right', render: (c) => czk(c.grossCzk) },
               {
                 accessor: 'withheldCzk',
                 title: 'Sraženo',
+                hint: G.divWithheld,
                 textAlign: 'right',
                 render: (c) => (
                   <>
@@ -127,13 +129,14 @@ export function DividendsPage({ s }: { s: Snapshot }) {
                   </>
                 ),
               },
-              { accessor: 'treatyRate', title: 'Smluvní sazba', textAlign: 'right', render: (c) => (c.treatyRate == null ? 'bez smlouvy' : pct(c.treatyRate, 0)) },
-              { accessor: 'creditableCzk', title: 'Započitatelné', textAlign: 'right', render: (c) => czk(c.creditableCzk) },
-              { accessor: 'czTaxCzk', title: 'Daň ČR 15 %', textAlign: 'right', render: (c) => czk(c.czTaxCzk) },
-              { accessor: 'dueCzk', title: 'Doplatek', textAlign: 'right', render: (c) => czk(c.dueCzk) },
+              { accessor: 'treatyRate', title: 'Smluvní sazba', hint: G.treatyRate, textAlign: 'right', render: (c) => (c.treatyRate == null ? 'bez smlouvy' : pct(c.treatyRate, 0)) },
+              { accessor: 'creditableCzk', title: 'Započitatelné', hint: G.creditable, textAlign: 'right', render: (c) => czk(c.creditableCzk) },
+              { accessor: 'czTaxCzk', title: 'Daň ČR 15 %', hint: G.czTax, textAlign: 'right', render: (c) => czk(c.czTaxCzk) },
+              { accessor: 'dueCzk', title: 'Doplatek', hint: G.due, textAlign: 'right', render: (c) => czk(c.dueCzk) },
               {
                 accessor: 'reclaimableCzk',
                 title: 'Vratitelné v zahraničí',
+                hint: G.reclaimable,
                 textAlign: 'right',
                 render: (c) => (
                   <Text span size="sm" c={c.reclaimableCzk > 0 ? 'orange' : undefined}>
@@ -159,11 +162,12 @@ export function DividendsPage({ s }: { s: Snapshot }) {
             columns={[
               { accessor: 'name', title: 'Instrument', searchValue: (r) => `${r.name} ${r.instrumentId}`, render: instrumentLink },
               { accessor: 'country', title: 'Stát', filterable: true },
-              { accessor: 'count', title: 'Výplat', textAlign: 'right' },
-              { accessor: 'grossCzk', title: 'Hrubě', textAlign: 'right', render: (r) => czk(r.grossCzk) },
+              { accessor: 'count', title: 'Výplat', hint: G.divCount, textAlign: 'right' },
+              { accessor: 'grossCzk', title: 'Hrubě', hint: G.divGross, textAlign: 'right', render: (r) => czk(r.grossCzk) },
               {
                 accessor: 'withheldCzk',
                 title: 'Sraženo',
+                hint: G.divWithheld,
                 textAlign: 'right',
                 render: (r) => (
                   <>
@@ -174,12 +178,13 @@ export function DividendsPage({ s }: { s: Snapshot }) {
                   </>
                 ),
               },
-              { accessor: 'netCzk', title: 'Čistě', textAlign: 'right', render: (r) => czk(r.netCzk) },
-              { accessor: 'creditableCzk', title: 'Započitatelné', textAlign: 'right', render: (r) => czk(r.creditableCzk) },
-              { accessor: 'dueCzk', title: 'Doplatek', textAlign: 'right', render: (r) => czk(r.dueCzk) },
+              { accessor: 'netCzk', title: 'Čistě', hint: G.divNet, textAlign: 'right', render: (r) => czk(r.netCzk) },
+              { accessor: 'creditableCzk', title: 'Započitatelné', hint: G.creditable, textAlign: 'right', render: (r) => czk(r.creditableCzk) },
+              { accessor: 'dueCzk', title: 'Doplatek', hint: G.due, textAlign: 'right', render: (r) => czk(r.dueCzk) },
               {
                 accessor: 'reclaimableCzk',
                 title: 'Vratitelné',
+                hint: G.reclaimable,
                 textAlign: 'right',
                 render: (r) => (
                   <Text span size="sm" c={r.reclaimableCzk > 0 ? 'orange' : undefined}>
@@ -215,18 +220,19 @@ export function DividendsPage({ s }: { s: Snapshot }) {
                     p.country
                   ),
               },
-              { accessor: 'gross', title: 'Hrubě', textAlign: 'right', sortValue: (p) => p.grossCzk, render: (p) => money(p.gross, p.currency) },
+              { accessor: 'gross', title: 'Hrubě', hint: G.divGrossOrig, textAlign: 'right', sortValue: (p) => p.grossCzk, render: (p) => money(p.gross, p.currency) },
               {
                 accessor: 'withheld',
                 title: 'Sraženo',
+                hint: G.divWithheld,
                 textAlign: 'right',
                 sortValue: (p) => p.withheldCzk,
                 render: (p) => `${money(p.withheld, p.currency)} (${pct(p.gross ? p.withheld / p.gross : null, 0)})`,
               },
-              { accessor: 'grossCzk', title: 'Hrubě Kč', textAlign: 'right', render: (p) => czk(p.grossCzk) },
-              { accessor: 'creditableCzk', title: 'Započitatelné', textAlign: 'right', render: (p) => czk(p.creditableCzk) },
-              { accessor: 'dueCzk', title: 'Doplatek', textAlign: 'right', render: (p) => (p.finalTaxed ? 'srážka CZ' : czk(p.dueCzk)) },
-              { accessor: 'reclaimable', title: 'Vratitelné', textAlign: 'right', sortValue: (p) => p.reclaimableCzk, render: (p) => (p.reclaimable > 0 ? money(p.reclaimable, p.currency) : '–') },
+              { accessor: 'grossCzk', title: 'Hrubě Kč', hint: G.divGross, textAlign: 'right', render: (p) => czk(p.grossCzk) },
+              { accessor: 'creditableCzk', title: 'Započitatelné', hint: G.creditable, textAlign: 'right', render: (p) => czk(p.creditableCzk) },
+              { accessor: 'dueCzk', title: 'Doplatek', hint: G.due, textAlign: 'right', render: (p) => (p.finalTaxed ? 'srážka CZ' : czk(p.dueCzk)) },
+              { accessor: 'reclaimable', title: 'Vratitelné', hint: `${G.reclaimable} Zobrazeno v měně výplaty.`, textAlign: 'right', sortValue: (p) => p.reclaimableCzk, render: (p) => (p.reclaimable > 0 ? money(p.reclaimable, p.currency) : '–') },
             ]}
           />
         </Tabs.Panel>

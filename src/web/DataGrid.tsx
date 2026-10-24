@@ -2,12 +2,15 @@ import { Group, MultiSelect, Stack, Text, TextInput } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { DataTable, type DataTableColumn, type DataTableRowExpansionProps, type DataTableSortStatus } from 'mantine-datatable';
 import { useMemo, useState, type ReactNode } from 'react';
+import { HintTitle } from './components';
 import { distinctValues, filterRows, searchRows, sortRows, type GridColumnMeta } from './table';
 
 export type GridColumn<T> = DataTableColumn<T> &
   Omit<GridColumnMeta<T>, 'accessor'> & {
     /** Show a multi-select value filter in the column header */
     filterable?: boolean;
+    /** Explanation shown in a tooltip next to the column title */
+    hint?: ReactNode;
   };
 
 export interface DataGridProps<T> {
@@ -61,8 +64,9 @@ export function DataGrid<T>({
   }, [filtered, metas, sort]);
 
   const cols: DataTableColumn<T>[] = columns.map((c) => {
-    const { filterable, sortValue: _s, searchValue: _q, filterValue: _f, ...col } = c;
+    const { filterable, hint, sortValue: _s, searchValue: _q, filterValue: _f, ...col } = c;
     const out: DataTableColumn<T> = { sortable: true, ...col };
+    if (hint) out.title = <HintTitle hint={hint}>{col.title}</HintTitle>;
     if (filterable) {
       const key = String(c.accessor);
       const options = distinctValues(records, c as GridColumnMeta<T>);

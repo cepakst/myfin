@@ -83,7 +83,8 @@ Aplikace obsahuje ukázkové exporty ve složce `demo/`: smyšlené portfolio u 
 - **Výdaje** = pořizovací cena + poplatky při nákupu i prodeji (transakční poplatky, AutoFX, transakční daně). Ztráta z prodejů CP se uplatní jen proti ziskům z CP v témže roce.
 - **Dividendy**: zápočet je nejvýše min(sražená daň, sazba dle smlouvy, 15 % z hrubé dividendy); v obecném základu navíc omezen koeficientem z Přílohy č. 3. Přeplatek nad smluvní sazbu lze reklamovat u zahraničního správce daně. České dividendy a úroky XTB jsou zdaněny srážkou konečně.
 - **Povinnost podat přiznání**: OSVČ vždy; zaměstnanec při jiných příjmech nad 20 000 Kč; paušální režim při příjmech §8–§10 nad 50 000 Kč; bez jiných příjmů při zdanitelných příjmech nad 50 000 Kč.
-- **Výkonnost**: TWR z denního ocenění, MWR (XIRR). Tržní ceny z Yahoo Finance; když chybí, použije se poslední obchodní cena (nebo ocenění brokera). Instrumenty bez tržních dat aplikace hlásí na Přehledu a v Nastavení (stav symbolu, filtr), odhadnuté ceny označuje „≈“.
+- **Výkonnost**: TWR z denního ocenění (denní řetězení, nákupy na začátku dne, prodeje a příjmy na konci), MWR (XIRR). Tržní ceny z Yahoo Finance; když chybí, použije se poslední obchodní cena (nebo ocenění brokera). Instrumenty bez tržních dat aplikace hlásí na Přehledu a v Nastavení (stav symbolu, filtr), odhadnuté ceny označuje „≈“.
+- **Vysvětlení metrik**: každá metrika, graf a číselný sloupec tabulky má u sebe ikonu ⓘ s přesnou definicí (vzorec a použitý kurz). Texty jsou na jednom místě v `src/web/glossary.ts`.
 
 ## Vývoj
 

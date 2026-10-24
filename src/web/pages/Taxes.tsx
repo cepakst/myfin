@@ -3,8 +3,9 @@ import { IconFileSpreadsheet } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Snapshot } from '../api';
-import { CopyValue, defaultYear, Section, Stat, WithHint, YearSelect } from '../components';
+import { CopyValue, defaultYear, HintTitle, Section, Stat, WithHint, YearSelect } from '../components';
 import { czk } from '../format';
+import { G } from '../glossary';
 import { TaxYearSettings } from './TaxYearSettings';
 
 export function DapBlocks({ blocks }: { blocks: Snapshot['dap'][number]['blocks'] }) {
@@ -115,7 +116,7 @@ export function TaxesPage({ s }: { s: Snapshot }) {
           label="Odhad daně celkem"
           value={czk(sum.estimatedTaxTotalCzk)}
           sub={`CP ${czk(sum.estimatedTaxSecuritiesCzk)} · dividendy ${czk(sum.estimatedTaxDividendsCzk)}${sum.year >= 2021 && sum.foreignDividendsCzk > 0 ? ` (${sum.use16a ? 'bez §16a' : 's §16a'} ${czk(sum.use16a ? sum.estimatedTaxDividendsGeneralCzk : sum.estimatedTaxDividends16aCzk)})` : ''}`}
-          hint="Odhad daně, kterou investice přidají k vaší dani z ostatních příjmů (15 %, nad limit 23 %), po zápočtu daně sražené v zahraničí. Závisí na „jiném základu daně“ zadaném v Nastavení."
+          hint={`${G.taxEstimate}\n„CP“ = prodeje cenných papírů a úroky, „dividendy“ = zahraniční dividendy; v závorce daň z dividend při opačné volbě (§16a / obecný základ).`}
         />
       </SimpleGrid>
       <Text size="sm" c="dimmed">
@@ -129,15 +130,21 @@ export function TaxesPage({ s }: { s: Snapshot }) {
         <Table fz="sm">
           <Table.Tbody>
             <Table.Tr>
-              <Table.Td>Zisk z prodejů se splněným časovým testem</Table.Td>
+              <Table.Td>
+                <HintTitle hint={G.ttGain}>Zisk z prodejů se splněným časovým testem</HintTitle>
+              </Table.Td>
               <Table.Td ta="right">{czk(sec.timeTestGainCzk)}</Table.Td>
             </Table.Tr>
             <Table.Tr>
-              <Table.Td>Osvobozený zisk celkem</Table.Td>
+              <Table.Td>
+                <HintTitle hint={G.exemptGain}>Osvobozený zisk celkem</HintTitle>
+              </Table.Td>
               <Table.Td ta="right">{czk(sec.exemptGainCzk)}</Table.Td>
             </Table.Tr>
             <Table.Tr>
-              <Table.Td>Ztráty z osvobozených prodejů (nelze uplatnit)</Table.Td>
+              <Table.Td>
+                <HintTitle hint={G.exemptLoss}>Ztráty z osvobozených prodejů (nelze uplatnit)</HintTitle>
+              </Table.Td>
               <Table.Td ta="right">{czk(sec.exemptLossCzk)}</Table.Td>
             </Table.Tr>
           </Table.Tbody>

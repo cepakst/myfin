@@ -4,6 +4,7 @@ import type { Snapshot } from '../api';
 import { Chart, Section, Stat, tooltipCzk } from '../components';
 import { useSetDemo } from '../demo';
 import { czk, date, pct, signColor } from '../format';
+import { G } from '../glossary';
 import { missingMarketData } from '../marketStatus';
 
 export function OverviewPage({ s }: { s: Snapshot }) {
@@ -40,21 +41,27 @@ export function OverviewPage({ s }: { s: Snapshot }) {
         </Alert>
       )}
       <SimpleGrid cols={{ base: 2, md: 4 }}>
-        <Stat label="Hodnota portfolia" value={czk(t.value)} sub={`k ${date(s.today)} · ${open.length} pozic`} />
-        <Stat label="Celkový zisk" value={czk(t.pnl)} color={signColor(t.pnl)} sub={`čistě investováno ${czk(t.invested)}`} />
-        <Stat label="Výnos (TWR) celkem" value={pct(t.twr)} color={signColor(t.twr)} sub={`XIRR ${pct(t.xirr)} p. a.`} />
-        <Stat label={`Letos (${curYear?.year})`} value={czk(curYear?.pnl)} color={signColor(curYear?.pnl)} sub={`TWR ${pct(curYear?.twr)}`} />
-        <Stat label="Dividendy (čistě)" value={czk(s.insights.total.dividendsNetCzk)} sub={`sraženo ${czk(s.insights.total.withholdingCzk)}`} />
-        <Stat label="Poplatky celkem" value={czk(fees)} sub={`${pct(t.pnl > 0 ? fees / t.pnl : null)} zisku`} />
-        <Stat label="Realizované zisky / ztráty" value={czk(s.insights.total.gainsCzk - s.insights.total.lossesCzk)} sub={`ztráty snědly ${pct(s.insights.total.eatenRatio)} zisků`} />
+        <Stat label="Hodnota portfolia" value={czk(t.value)} sub={`k ${date(s.today)} · ${open.length} pozic`} hint={G.value} />
+        <Stat label="Celkový zisk" value={czk(t.pnl)} color={signColor(t.pnl)} sub={`čistě investováno ${czk(t.invested)}`} hint={`${G.pnl}\n\n${G.invested}`} />
+        <Stat label="Výnos (TWR) celkem" value={pct(t.twr)} color={signColor(t.twr)} sub={`XIRR ${pct(t.xirr)} p. a.`} hint={`${G.twr}\n\n${G.xirr}`} />
+        <Stat label={`Letos (${curYear?.year})`} value={czk(curYear?.pnl)} color={signColor(curYear?.pnl)} sub={`TWR ${pct(curYear?.twr)}`} hint={`${G.yearPnl}\n\n${G.yearTwr}`} />
+        <Stat label="Dividendy (čistě)" value={czk(s.insights.total.dividendsNetCzk)} sub={`sraženo ${czk(s.insights.total.withholdingCzk)}`} hint={G.dividendsNet} />
+        <Stat label="Poplatky celkem" value={czk(fees)} sub={`${pct(t.pnl > 0 ? fees / t.pnl : null)} zisku`} hint={G.feesTotal} />
+        <Stat label="Realizované zisky / ztráty" value={czk(s.insights.total.gainsCzk - s.insights.total.lossesCzk)} sub={`ztráty snědly ${pct(s.insights.total.eatenRatio)} zisků`} hint={G.realizedNet} />
         <Stat
           label={`Odhad daně ${curTax?.year}`}
           value={czk(curTax?.estimatedTaxTotalCzk)}
           sub={curTax?.mustFile ? 'přiznání podat' : curTax?.mustFile === false ? 'přiznání není nutné' : ''}
+          hint={`${G.taxEstimate}\n\n${G.mustFile}`}
         />
       </SimpleGrid>
+      <Text size="xs" c="dimmed" data-testid="metrics-footnote">
+        TWR (časově vážený výnos) měří výkonnost samotných investic bez vlivu toho, kdy a kolik jste investovali – je srovnatelný s indexem. XIRR (peněžně vážený roční výnos) zohledňuje
+        i načasování a velikost nákupů a prodejů: pokud jste hodně nakoupili před růstem, vyjde vyšší než TWR, a naopak. Částky jsou v Kč přepočtené denním kurzem ČNB (kromě odhadu daně,
+        který používá daňový přepočet). Přesné vzorce zobrazíte najetím na ikonu ⓘ.
+      </Text>
 
-      <Section title="Vývoj hodnoty portfolia">
+      <Section title="Vývoj hodnoty portfolia" hint={G.valueChart}>
         <Chart
           height={360}
           option={{
@@ -74,7 +81,7 @@ export function OverviewPage({ s }: { s: Snapshot }) {
 
       <Grid>
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Section title="Kumulativní výnos (TWR)">
+          <Section title="Kumulativní výnos (TWR)" hint={G.twrChart}>
             <Chart
               option={{
                 tooltip: { trigger: 'axis', valueFormatter: (v) => pct(Number(v)) },
@@ -87,7 +94,7 @@ export function OverviewPage({ s }: { s: Snapshot }) {
           </Section>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Section title="Rozložení portfolia">
+          <Section title="Rozložení portfolia" hint={G.allocation}>
             <Chart
               option={{
                 tooltip: { trigger: 'item', valueFormatter: tooltipCzk },

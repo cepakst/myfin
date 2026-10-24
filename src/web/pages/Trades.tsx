@@ -5,6 +5,7 @@ import type { Snapshot } from '../api';
 import { defaultYear, Stat, WithHint, YearSelect } from '../components';
 import { DataGrid } from '../DataGrid';
 import { czk, date, money, num, signColor } from '../format';
+import { G } from '../glossary';
 
 type R = Snapshot['realizations'][number];
 
@@ -75,13 +76,14 @@ export function TradesPage({ s }: { s: Snapshot }) {
           { accessor: 'broker', title: 'Broker', filterable: true },
           { accessor: 'acqDate', title: 'Nákup', render: (r) => date(r.acqDate) },
           { accessor: 'sellDate', title: 'Prodej', render: (r) => date(r.sellDate) },
-          { accessor: 'holdingDays', title: 'Drženo', textAlign: 'right', render: (r) => `${r.holdingDays} d` },
-          { accessor: 'qty', title: 'Kusů', textAlign: 'right', render: (r) => num(r.qty) },
-          { accessor: 'sellPrice', title: 'Prodejní cena', textAlign: 'right', sortable: false, render: (r) => money(r.sellPrice, r.currency) },
-          { accessor: 'proceedsCzk', title: 'Příjem', textAlign: 'right', render: (r) => czk(r.proceedsCzk) },
+          { accessor: 'holdingDays', title: 'Drženo', hint: G.holding, textAlign: 'right', render: (r) => `${r.holdingDays} d` },
+          { accessor: 'qty', title: 'Kusů', hint: G.realQty, textAlign: 'right', render: (r) => num(r.qty) },
+          { accessor: 'sellPrice', title: 'Prodejní cena', hint: G.unitPrice, textAlign: 'right', sortable: false, render: (r) => money(r.sellPrice, r.currency) },
+          { accessor: 'proceedsCzk', title: 'Příjem', hint: G.proceedsTax, textAlign: 'right', render: (r) => czk(r.proceedsCzk) },
           {
             accessor: 'costCzk',
             title: 'Výdaje',
+            hint: G.costsTax,
             textAlign: 'right',
             sortValue: (r) => r.costCzk + r.buyFeesCzk + r.sellFeesCzk,
             render: (r) => (
@@ -93,6 +95,7 @@ export function TradesPage({ s }: { s: Snapshot }) {
           {
             accessor: 'gainCzk',
             title: 'Zisk',
+            hint: G.gainTax,
             textAlign: 'right',
             render: (r) => (
               <Text size="sm" c={signColor(r.gainCzk)}>
@@ -103,6 +106,7 @@ export function TradesPage({ s }: { s: Snapshot }) {
           {
             accessor: 'taxStatus',
             title: 'Daň',
+            hint: G.taxStatus,
             width: 150,
             noWrap: true,
             filterable: true,

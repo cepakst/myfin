@@ -5,6 +5,7 @@ import type { Snapshot } from '../api';
 import { Chart, Section, Stat, tooltipCzk } from '../components';
 import { DataGrid } from '../DataGrid';
 import { czk, date, num, pct, signColor } from '../format';
+import { G } from '../glossary';
 
 type TR = Snapshot['insights']['bestTrades'][number];
 
@@ -29,10 +30,11 @@ function TradeTable({ rows, label, dir }: { rows: TR[]; label: string; dir: 'asc
       columns={[
         { accessor: 'name', title: 'Instrument', render: instrumentLink('xs') },
         { accessor: 'sellDate', title: 'Prodej', render: (r) => date(r.sellDate) },
-        { accessor: 'holdingDays', title: 'Drženo', textAlign: 'right', render: (r) => `${Math.round(r.holdingDays)} d` },
+        { accessor: 'holdingDays', title: 'Drženo', hint: 'Průměr dní od nákupu do prodeje přes prodané FIFO loty, vážený počtem kusů.', textAlign: 'right', render: (r) => `${Math.round(r.holdingDays)} d` },
         {
           accessor: 'gainCzk',
           title: 'Zisk',
+          hint: 'Zisk = (prodejní cena − poplatky) − (nákupní cena FIFO lotů + nákupní poplatky), denní kurz ČNB. V závorce: zisk / (nákupní cena + nákupní poplatky).',
           textAlign: 'right',
           render: (r) => (
             <Text size="xs" c={signColor(r.gainCzk)}>
@@ -90,40 +92,40 @@ export function InsightsPage({ s }: { s: Snapshot }) {
           label="Ztráty snědly ze zisků"
           value={pct(i.total.eatenRatio)}
           sub={`zisky ${czk(i.total.gainsCzk)} / ztráty ${czk(i.total.lossesCzk)}`}
-          hint="Jaký podíl realizovaných zisků z prodejů vymazaly realizované ztráty (ekonomicky, bez ohledu na daně)."
+          hint={G.eaten}
         />
         <Stat
           label="Poplatky / objem obchodů"
           value={pct(i.total.feeToVolume, 2)}
           sub={`${czk(i.total.tradeFeesCzk)} z ${czk(i.total.volumeCzk)}`}
-          hint="Obchodní poplatky a transakční daně jako podíl z celkového objemu nákupů a prodejů."
+          hint={G.feeToVolume}
         />
         <Stat
           label="Prům. držení ziskových"
           value={days(i.avgHoldingDaysWinners)}
-          hint="Průměrná doba držení prodaných kusů, které skončily ziskem (vážená počtem kusů)."
+          hint={G.avgHoldWin}
         />
-        <Stat label="Prům. držení ztrátových" value={days(i.avgHoldingDaysLosers)} hint="Průměrná doba držení prodaných kusů, které skončily ztrátou (vážená počtem kusů)." />
+        <Stat label="Prům. držení ztrátových" value={days(i.avgHoldingDaysLosers)} hint={G.avgHoldLoss} />
         <Stat
           label="Ušlý potenciál (absolutní)"
           value={czk(i.missedTotalCzk)}
           color="orange"
           sub={`uchráněno ${czk(i.avoidedTotalCzk)} · netto ${czk(i.missedNetCzk)}`}
-          hint="Kolik by dnes měly navíc prodané kusy, kdybyste je drželi dodnes (součet jen u pozic, které od prodeje vzrostly). „Uchráněno“ je naopak pokles pozic, které jste prodali včas; „netto“ je rozdíl obou."
+          hint={G.missed}
         />
         <Stat
           label="Ušlý potenciál po reinvestici"
           value={czk(i.missedNetReinvestedCzk)}
           color={i.missedNetReinvestedCzk > 0 ? 'orange' : 'teal'}
           sub={i.missedNetReinvestedCzk > 0 ? 'držení by vyšlo lépe' : 'reinvestice vyšla lépe'}
-          hint="Netto rozdíl mezi dnešní hodnotou prodaných kusů a odhadem, kolik by dnes měly peníze z prodeje, pokud zůstaly v portfoliu a vydělávaly jako celé portfolio (časově vážený výnos od data prodeje). Kladné číslo = držet by bylo lepší."
+          hint={G.missedReinvested}
         />
-        <Stat label="Dividendy čistě" value={czk(i.total.dividendsNetCzk)} sub={`srážky ${czk(i.total.withholdingCzk)}`} hint="Přijaté dividendy po zahraniční srážkové dani, přepočtené denním kurzem ČNB." />
-        <Stat label="Poplatky účtu" value={czk(i.total.accountFeesCzk)} sub="připojení k burzám apod." hint="Poplatky nesouvisející s konkrétním obchodem, např. roční poplatek za připojení k burze." />
+        <Stat label="Dividendy čistě" value={czk(i.total.dividendsNetCzk)} sub={`srážky ${czk(i.total.withholdingCzk)}`} hint={G.insightDividends} />
+        <Stat label="Poplatky účtu" value={czk(i.total.accountFeesCzk)} sub="připojení k burzám apod." hint={G.insightAccountFees} />
       </SimpleGrid>
       <Grid>
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Section title="Realizované zisky vs. ztráty">
+          <Section title="Realizované zisky vs. ztráty" hint={G.gainsLossesChart}>
             <Chart
               option={{
                 tooltip: { trigger: 'axis', valueFormatter: tooltipCzk },
@@ -141,7 +143,7 @@ export function InsightsPage({ s }: { s: Snapshot }) {
           </Section>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Section title="Poplatky po letech">
+          <Section title="Poplatky po letech" hint={G.feesChart}>
             <Chart
               option={{
                 tooltip: { trigger: 'axis', valueFormatter: tooltipCzk },
@@ -168,13 +170,14 @@ export function InsightsPage({ s }: { s: Snapshot }) {
           searchPlaceholder="Hledat instrument, ISIN…"
           columns={[
             { accessor: 'name', title: 'Instrument', searchValue: (m) => `${m.name} ${m.instrumentId}`, render: instrumentLink('sm') },
-            { accessor: 'soldQty', title: 'Prodáno ks', textAlign: 'right', render: (m) => num(m.soldQty) },
+            { accessor: 'soldQty', title: 'Prodáno ks', hint: G.soldQty, textAlign: 'right', render: (m) => num(m.soldQty) },
             { accessor: 'lastSellDate', title: 'Poslední prodej', render: (m) => date(m.lastSellDate) },
-            { accessor: 'proceedsCzk', title: 'Utrženo', textAlign: 'right', render: (m) => czk(m.proceedsCzk) },
-            { accessor: 'valueTodayCzk', title: 'Hodnota dnes', textAlign: 'right', render: (m) => czk(m.valueTodayCzk) },
+            { accessor: 'proceedsCzk', title: 'Utrženo', hint: G.proceedsNet, textAlign: 'right', render: (m) => czk(m.proceedsCzk) },
+            { accessor: 'valueTodayCzk', title: 'Hodnota dnes', hint: G.valueToday, textAlign: 'right', render: (m) => czk(m.valueTodayCzk) },
             {
               accessor: 'diffCzk',
               title: 'Ušlo (absolutně)',
+              hint: G.diff,
               textAlign: 'right',
               render: (m) => (
                 <Text size="sm" c={m.diffCzk > 0 ? 'orange' : 'teal'}>
@@ -182,10 +185,11 @@ export function InsightsPage({ s }: { s: Snapshot }) {
                 </Text>
               ),
             },
-            { accessor: 'reinvestedValueCzk', title: 'Reinvestice dnes', textAlign: 'right', render: (m) => czk(m.reinvestedValueCzk) },
+            { accessor: 'reinvestedValueCzk', title: 'Reinvestice dnes', hint: G.reinvested, textAlign: 'right', render: (m) => czk(m.reinvestedValueCzk) },
             {
               accessor: 'diffReinvestedCzk',
               title: 'Ušlo po reinvestici',
+              hint: G.diffReinvested,
               textAlign: 'right',
               render: (m) => (
                 <Text size="sm" c={m.diffReinvestedCzk > 0 ? 'orange' : 'teal'}>
@@ -203,12 +207,12 @@ export function InsightsPage({ s }: { s: Snapshot }) {
       </Section>
       <Grid>
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Section title="Nejlepší obchody">
+          <Section title="Nejlepší obchody" hint={G.bestWorst}>
             <TradeTable rows={i.bestTrades} label="Nejlepší obchody" dir="desc" />
           </Section>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Section title="Nejhorší obchody">
+          <Section title="Nejhorší obchody" hint={G.bestWorst}>
             <TradeTable rows={i.worstTrades} label="Nejhorší obchody" dir="asc" />
           </Section>
         </Grid.Col>

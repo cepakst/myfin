@@ -54,11 +54,14 @@ export function Stat({ label, value, sub, color, hint }: { label: string; value:
   );
 }
 
-export function Section({ title, children, right }: { title: ReactNode; children: ReactNode; right?: ReactNode }) {
+export function Section({ title, children, right, hint }: { title: ReactNode; children: ReactNode; right?: ReactNode; hint?: ReactNode }) {
   return (
     <Card withBorder radius="md" p="md">
       <Group justify="space-between" mb="sm">
-        <Text fw={600}>{title}</Text>
+        <Group gap={6} wrap="nowrap">
+          <Text fw={600}>{title}</Text>
+          {hint && <Hint label={hint} />}
+        </Group>
         {right}
       </Group>
       {children}
@@ -66,19 +69,39 @@ export function Section({ title, children, right }: { title: ReactNode; children
   );
 }
 
-/** Small info icon with an explanatory tooltip */
+const hintStyle = { whiteSpace: 'pre-line' } as const;
+
+/** Small info icon with an explanatory tooltip; newlines in string labels render as paragraph breaks */
 export function Hint({ label }: { label: ReactNode }) {
   return (
-    <Tooltip label={label} multiline w={320} withArrow events={{ hover: true, focus: true, touch: true }}>
-      <IconInfoCircle size={14} style={{ opacity: 0.6, cursor: 'help', flexShrink: 0 }} tabIndex={0} aria-label="Nápověda" />
+    <Tooltip label={label} multiline w={360} withArrow events={{ hover: true, focus: true, touch: true }} style={hintStyle}>
+      <IconInfoCircle
+        size={14}
+        style={{ opacity: 0.6, cursor: 'help', flexShrink: 0 }}
+        tabIndex={0}
+        aria-label="Nápověda"
+        // Inside a sortable table header the icon must not toggle sorting (mouse or Enter key)
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      />
     </Tooltip>
+  );
+}
+
+/** Column or row title followed by an info icon */
+export function HintTitle({ children, hint }: { children: ReactNode; hint: ReactNode }) {
+  return (
+    <Group component="span" gap={4} wrap="nowrap" style={{ display: 'inline-flex' }}>
+      {children}
+      <Hint label={hint} />
+    </Group>
   );
 }
 
 /** Wraps any element (e.g. a badge) with an explanatory tooltip */
 export function WithHint({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <Tooltip label={label} multiline w={340} withArrow events={{ hover: true, focus: true, touch: true }}>
+    <Tooltip label={label} multiline w={340} withArrow events={{ hover: true, focus: true, touch: true }} style={hintStyle}>
       <span style={{ cursor: 'help', display: 'inline-flex' }} tabIndex={0}>
         {children}
       </span>

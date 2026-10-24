@@ -4,8 +4,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { profileFor, SITUATION_LABELS, withYearProfile, type TaxSituation } from '../../core/settings';
 import { api, useStatus, type Settings, type Snapshot } from '../api';
-import { Hint, Section } from '../components';
+import { Hint, HintTitle, Section } from '../components';
 import { czk, SITUATIONS } from '../format';
+import { G } from '../glossary';
 
 type FxMethod = 'UNIFIED' | 'DAILY';
 const DEFAULT = 'DEFAULT';
@@ -158,16 +159,24 @@ export function TaxYearSettings({ s, year }: { s: Snapshot; year: number }) {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Přepočet měn</Table.Th>
-                  <Table.Th>Dividendy</Table.Th>
-                  <Table.Th ta="right">Základ §10</Table.Th>
-                  <Table.Th ta="right">Daň CP</Table.Th>
+                  <Table.Th>
+                    <HintTitle hint={G.scenarioDividends}>Dividendy</HintTitle>
+                  </Table.Th>
+                  <Table.Th ta="right">
+                    <HintTitle hint={G.scenarioBase}>Základ §10</HintTitle>
+                  </Table.Th>
+                  <Table.Th ta="right">
+                    <HintTitle hint={G.scenarioSecTax}>Daň CP</HintTitle>
+                  </Table.Th>
                   <Table.Th ta="right">
                     <Group gap={4} justify="flex-end" wrap="nowrap">
                       Daň dividendy
                       <Hint label="Doplatek české daně ze zahraničních dividend. U §16a se zahraniční daň započte až do 15 %, takže při srážce 15 % bývá doplatek 0 Kč. V obecném základu je zápočet omezen poměrem (Příloha č. 3) a závisí na sazbě a slevách." />
                     </Group>
                   </Table.Th>
-                  <Table.Th ta="right">Daň celkem</Table.Th>
+                  <Table.Th ta="right">
+                    <HintTitle hint={G.scenarioTotal}>Daň celkem</HintTitle>
+                  </Table.Th>
                   <Table.Th />
                 </Table.Tr>
               </Table.Thead>
