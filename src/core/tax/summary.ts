@@ -25,7 +25,7 @@ export interface YearTaxSummary {
   otherCapitalIncomeCzk: number;
   /** Taxable income relevant for filing thresholds (gross §8 + §10 income, excluding exempt and final-taxed) */
   thresholdIncomeCzk: number;
-  /** Estimated ř. 42 – general tax base incl. the other base from Settings */
+  /** Estimated row 42 – general tax base incl. the other base from Settings */
   generalBaseCzk: number;
   estimatedTaxSecuritiesCzk: number;
   estimatedTaxDividendsCzk: number;
@@ -55,7 +55,7 @@ export function yearTaxSummary(settings: Settings, sec: SecuritiesYearReport, di
     const total = otherBase + invest;
     let tax = marginalTax(total, 0, year);
     if (withDividends && foreignDividendsCzk > 0) tax -= computePriloha3(div, total, year).r328;
-    // without other income the basic credit (sleva na poplatníka) is still available
+    // without other income the basic personal tax credit is still available
     if (noIncome) return Math.max(0, tax - basicTaxCredit(year));
     return Math.max(0, tax - marginalTax(otherBase, 0, year));
   };

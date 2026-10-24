@@ -19,7 +19,7 @@ const kc = (n: number) => Math.round(n);
 const floor100 = (n: number) => Math.floor(Math.max(0, n) / 100) * 100;
 const fmt = (n: number) => `${Math.round(n).toLocaleString('cs-CZ')} Kč`;
 
-/** Sleva na poplatníka (§35ba/1/a) */
+/** Basic personal tax credit – "sleva na poplatníka" (§35ba/1/a) */
 export function basicTaxCredit(year: number): number {
   return year <= 2020 ? 24_840 : year === 2021 ? 27_840 : 30_840;
 }
@@ -40,11 +40,11 @@ export interface Priloha4 {
   r411: number;
   r412: number;
   r413: number;
-  /** → ř. 74a */
+  /** Carried to main form row 74a */
   r414: number;
 }
 
-/** Příloha č. 4 – samostatný základ daně podle §16a (zahraniční dividendy, sazba 15 %) */
+/** Příloha č. 4 – separate §16a tax base (foreign dividends, 15 % rate) */
 export function computePriloha4(div: DividendYearReport): Priloha4 {
   const ps = foreignPayments(div);
   const r401a = kc(ps.reduce((s, p) => s + p.grossCzk, 0));
@@ -73,18 +73,18 @@ export interface Priloha3Country {
 }
 
 export interface Priloha3 {
-  /** ř. 42 – total general tax base used for the coefficient (estimate) */
+  /** Row 42 – total general tax base used for the coefficient (estimate) */
   r42: number;
-  /** ř. 57 – tax on the general base before credits (estimate) */
+  /** Row 57 – tax on the general base before credits (estimate) */
   r57: number;
   countries: Priloha3Country[];
   r328: number;
   r329: number;
-  /** → ř. 58 */
+  /** Carried to main form row 58 */
   r330: number;
 }
 
-/** Příloha č. 3 – zápočet daně zaplacené v zahraničí (foreign dividends taxed in the general base) */
+/** Příloha č. 3 – foreign tax credit per country (foreign dividends taxed in the general base) */
 export function computePriloha3(div: DividendYearReport, generalBaseCzk: number, year: number): Priloha3 {
   const r42 = kc(Math.max(0, generalBaseCzk));
   const r57 = kc(marginalTax(floor100(r42), 0, year));
@@ -118,7 +118,7 @@ export function computePriloha3(div: DividendYearReport, generalBaseCzk: number,
   return { r42, r57, countries, r328, r329, r330: Math.max(0, r57 - r328) };
 }
 
-/** Příloha č. 2 – oddíl 2: ostatní příjmy podle §10 (prodej cenných papírů) */
+/** Příloha č. 2, section 2 – other income under §10 (sale of securities) */
 export function dapSecurities(sec: SecuritiesYearReport): DapBlock {
   const t = sec.taxable;
   const title = 'Příloha č. 2 – oddíl 2: Ostatní příjmy podle § 10';
@@ -151,13 +151,13 @@ export function dapSecurities(sec: SecuritiesYearReport): DapBlock {
 
 export interface DividendDapOptions {
   use16a: boolean;
-  /** ř. 42 estimate – total general tax base including investment income taxed in it */
+  /** Row 42 estimate – total general tax base including investment income taxed in it */
   generalBaseCzk: number;
-  /** §8 income without final withholding that goes to ř. 38 regardless of §16a (e.g. interest) */
+  /** §8 income without final withholding that goes to row 38 regardless of §16a (e.g. interest) */
   otherCapitalCzk: number;
 }
 
-/** Foreign dividends: Příloha č. 4 (§16a) or ř. 38 + Příloha č. 3 */
+/** Foreign dividends: Příloha č. 4 (§16a) or row 38 + Příloha č. 3 */
 export function dapDividends(div: DividendYearReport, year: number, opts: DividendDapOptions): DapBlock[] {
   const blocks: DapBlock[] = [];
   const gross = div.foreign.grossCzk;

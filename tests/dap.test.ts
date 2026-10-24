@@ -106,7 +106,7 @@ describe('DAP blocks', () => {
     expect(with16a.map((b) => b.title)).toEqual(['Příloha č. 4 – samostatný základ daně podle § 16a']);
     const general = dapDividends(div, 2024, { use16a: false, generalBaseCzk: 500_000, otherCapitalCzk: 0 });
     expect(general[0].fields[0]).toMatchObject({ row: '38', value: 4500 });
-    expect(general.filter((b) => b.title.startsWith('Příloha č. 3'))).toHaveLength(3); // FR, US (samostatný list), totals
+    expect(general.filter((b) => b.title.startsWith('Příloha č. 3'))).toHaveLength(3); // FR, US (additional sheet), totals
     expect(general[2].title).toContain('samostatný list');
   });
 
