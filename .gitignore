@@ -6,6 +6,8 @@ data/
 *.xlsx
 *.csv
 *.zip
+# Synthetic E2E fixtures only - never put real exports here
+!tests/e2e/fixtures/**/*.csv
 
 # Python
 __pycache__/
@@ -17,6 +19,8 @@ __pycache__/
 node_modules/
 dist/
 dist-electron/
+test-results/
+playwright-report/
 
 # Misc
 .env

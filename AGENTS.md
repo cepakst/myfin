@@ -39,6 +39,7 @@ npm install
 npm run dev          # API (tsx watch) + Vite dev server
 npm run typecheck    # tsc --noEmit
 npm test             # vitest run
+npm run test:e2e     # build + Playwright (Chromium) against synthetic fixtures
 npm run build        # web (Vite) + server (esbuild) -> dist/
 npm start            # node dist/server/main.js on http://127.0.0.1:5174
 npm run electron     # build and run the desktop app
@@ -46,6 +47,41 @@ npm run dist:win     # NSIS installer -> dist-electron/
 ```
 
 Run `npm run typecheck` and `npm test` after every change; run `npm run build` for UI/server changes.
+
+`npm run test:e2e` starts the built server on port 5199 with an isolated data dir (`%TEMP%\myfin-e2e`) and only the synthetic exports in `tests/e2e/fixtures`. It needs loopback network access (and public CNB/Yahoo access for rates/prices). Never point it at real exports.
+
+## Workflow and Definition of Done
+
+### Major functional changes
+
+A **major functional change** is a new feature, any change to parsers, FIFO, FX or tax rules, any new network access or integration, a change to data storage, or a user-visible behaviour change on any page. Such a change is done only after **all** of the following steps. When working autonomously, do not skip any of them.
+
+1. **Implement** (main agent), including a short test plan of user scenarios and edge cases.
+2. **Automated tests:** delegate to a subagent on the **latest Claude Sonnet** model.
+   - Unit tests (Vitest, `tests/*.test.ts`) for every changed rule or branch.
+   - Playwright tests (`tests/e2e/*.spec.ts`) for every UI change.
+   - Synthetic data only. Extend `tests/e2e/fixtures` when needed.
+3. **Code review:** `code-review` agent on the full diff.
+4. **Security and privacy review:** `security-review` agent on the full diff. It must explicitly check the four guard rails above, including what is sent over the network and where data is written.
+5. **User acceptance test:** a subagent on the **latest Claude Haiku** model.
+   - It runs the app (`npm run build && npm start`, or the E2E server).
+   - It works through the test plan from step 1 like a user would.
+   - It checks the displayed numbers against expected values and reports every discrepancy.
+   - It may use the user's local data for this, but it reports aggregates only.
+6. **Fix and repeat:** fix every confirmed finding and re-run the affected steps. A finding that is rejected must have a recorded reason.
+7. **Gate:** `npm run typecheck`, `npm test` and `npm run test:e2e` all pass. `npm run build` passes for UI/server changes.
+8. **Report** to the user before committing. The report lists:
+   - what changed,
+   - test coverage added,
+   - review findings and how each was resolved,
+   - the result of the user acceptance test,
+   - anything that could not be verified (for example, a sandbox blocking the network).
+
+### Minor changes
+
+Text and copy edits, styling, docs, comments, and refactors without behaviour change need only step 7. A refactor still needs a code review if it touches tax, FIFO or FX logic.
+
+If a step cannot be run (for example, a tool or the network is unavailable), say so explicitly in the report. Never present the change as fully verified in that case.
 
 ## Conventions
 
