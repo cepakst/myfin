@@ -1,4 +1,4 @@
-import { Alert, AppShell, Burger, Button, Center, Code, Group, Loader, NavLink, ScrollArea, Stack, Text, Title } from '@mantine/core';
+import { Alert, AppShell, Burger, Button, Center, Code, Group, Loader, NavLink, ScrollArea, Stack, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconBulb,
@@ -14,6 +14,7 @@ import {
 } from '@tabler/icons-react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { api, useSnapshot, useStatus } from './api';
+import { Brand } from './Brand';
 import { DemoBadge } from './demo';
 import { DividendsPage } from './pages/Dividends';
 import { InsightsPage } from './pages/Insights';
@@ -88,7 +89,7 @@ export function App() {
         <Group h="100%" px="md" justify="space-between">
           <Group>
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Title order={3}>My finance</Title>
+            <Brand />
             {snap.data?.demo && <DemoBadge />}
           </Group>
           <Group gap="xs">

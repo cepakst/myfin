@@ -25,7 +25,7 @@ test.describe('demo data', () => {
     const { errors, foreignRequests } = trackErrors(page);
     await page.goto('/#/nastaveni');
     const header = page.locator('header');
-    await expect(header.getByText('My finance')).toBeVisible();
+    await expect(header.getByTestId('brand')).toContainText('Myfin');
     await expect(header.getByTestId('demo-badge')).toHaveCount(0);
 
     await page.locator('main').getByText('Demo data', { exact: true }).click();

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const DEFAULT_PORT = 5174;
 
@@ -39,7 +40,9 @@ async function createWindow(url: string) {
     height: 950,
     minWidth: 900,
     minHeight: 600,
-    title: 'My finance',
+    title: 'Myfin',
+    // dist/electron/main.js -> dist/web (also inside the packaged app archive)
+    icon: join(dirname(fileURLToPath(import.meta.url)), '..', 'web', 'icon-256.png'),
     autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
@@ -91,7 +94,7 @@ app.whenReady().then(async () => {
     serverUrl = await startServer();
     await createWindow(serverUrl);
   } catch (e) {
-    dialog.showErrorBox('My finance', `Server se nepodařilo spustit:\n${(e as Error).stack ?? e}`);
+    dialog.showErrorBox('Myfin', `Server se nepodařilo spustit:\n${(e as Error).stack ?? e}`);
     app.quit();
   }
 });

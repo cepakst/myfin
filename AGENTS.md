@@ -18,7 +18,7 @@ Before every commit, review the staged file list. `exports/`, `data/`, `dist/`, 
 
 ## Project overview
 
-"My finance" – a local desktop app (Windows and macOS) that analyses Degiro and XTB exports: yearly returns, FIFO lots with the Czech 3-year time test, realised P/L, Czech tax return (DAP) values for §10 and foreign dividends, tax optimisation tips.
+"Myfin" (tagline "Moje finance přehledně") – a local desktop app (Windows and macOS) that analyses Degiro and XTB exports: yearly returns, FIFO lots with the Czech 3-year time test, realised P/L, Czech tax return (DAP) values for §10 and foreign dividends, tax optimisation tips.
 
 - `src/core` – pure logic: parsers, FX (CNB rates, unified rate), FIFO, tax rules, analytics. No I/O.
 - `src/server` – Fastify API, CNB/Yahoo caches, snapshot assembly (`engine.ts`). `taxReport.ts` builds the per-year Excel audit workbook (`GET /api/tax-report/:year`) with Excel formulas whose cached results must equal the app's values; `tests/taxReport.test.ts` recalculates every formula and compares it with the DAP rows, so keep both in sync when tax logic changes.
@@ -48,6 +48,7 @@ npm run electron     # build and run the desktop app
 npm run dist:win     # NSIS installer -> dist-electron/
 npm run dist:mac     # unsigned dmg + zip (arm64, x64) -> dist-electron/; runs on macOS only
 npm run demo:generate [YYYY-MM-DD]  # regenerate demo/ (needs Yahoo access; deterministic seed)
+npm run icons        # rasterise src/web/public/logo.svg -> favicon/Electron PNGs and build/icon.png (electron-builder source for .ico/.icns)
 ```
 
 Launchers: `start.bat` (Windows), `start.sh` / `start.command` (macOS, Linux) – install deps on first run, build, open the browser.

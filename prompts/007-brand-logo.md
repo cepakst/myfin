@@ -1,0 +1,1 @@
+Zmen text v headeru na Myfin z Moje finance a vyrob logo inspirovane padesatikorunovou czk minci, stranou se lvem. Logo pouzij jak v headeru tak pro ikonu v prohlizeci/electron aplikace. Logo by melo vypadat stylove spis ilustrovane nez realisticke. Za Myfin by mohlo byt neco jako subtext "Moje finance prehledne". Ale nechci aby se header zvetsil. Vyres to nejak pekne stylove.

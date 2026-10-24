@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBE3A0"/>
+      <stop offset="0.45" stop-color="#E2B44F"/>
+      <stop offset="1" stop-color="#A9781F"/>
+    </linearGradient>
+    <radialGradient id="core" cx="0.38" cy="0.32" r="0.8">
+      <stop offset="0" stop-color="#F3B98A"/>
+      <stop offset="0.55" stop-color="#D08350"/>
+      <stop offset="1" stop-color="#9C5228"/>
+    </radialGradient>
+    <g id="lion" stroke-linecap="round" stroke-linejoin="round">
+      <!-- double-tailed (Czech) lion tail -->
+      <path d="M70 70 C88 70 90 52 80 42 C76 38 74 32 76 26" fill="none" stroke="currentColor" stroke-width="4.2"/>
+      <path d="M80 42 C86 38 90 34 90 27" fill="none" stroke="currentColor" stroke-width="3.6"/>
+      <path d="M76 26 C72 22 74 15 79 16 C77 20 80 22 80 25 Z" fill="currentColor" stroke="currentColor" stroke-width="2"/>
+      <path d="M90 27 C88 21 92 15 96 18 C93 21 95 24 93 27 Z" fill="currentColor" stroke="currentColor" stroke-width="2"/>
+      <!-- hind legs -->
+      <path d="M62 72 L55 84 L48 92" fill="none" stroke="currentColor" stroke-width="8"/>
+      <path d="M48 92 L40 93 M48 92 L42 96" fill="none" stroke="currentColor" stroke-width="4"/>
+      <path d="M68 76 L74 87 L70 95" fill="none" stroke="currentColor" stroke-width="8"/>
+      <path d="M70 95 L78 97 M70 95 L76 99" fill="none" stroke="currentColor" stroke-width="4"/>
+      <ellipse cx="64" cy="70" rx="10" ry="12" transform="rotate(-25 64 70)" fill="currentColor"/>
+      <!-- torso leaning forward -->
+      <ellipse cx="54" cy="54" rx="11" ry="19" transform="rotate(-32 54 54)" fill="currentColor"/>
+      <!-- raised front legs with claws -->
+      <path d="M46 44 L34 40 L26 30" fill="none" stroke="currentColor" stroke-width="7.5"/>
+      <path d="M26 30 L20 28 M26 30 L21 24 M26 30 L25 23" fill="none" stroke="currentColor" stroke-width="3.2"/>
+      <path d="M50 54 L38 58 L28 52" fill="none" stroke="currentColor" stroke-width="7.5"/>
+      <path d="M28 52 L22 52 M28 52 L22 47 M28 52 L26 46" fill="none" stroke="currentColor" stroke-width="3.2"/>
+      <!-- scalloped mane -->
+      <circle cx="44" cy="17" r="7" fill="currentColor"/>
+      <circle cx="50" cy="24" r="7" fill="currentColor"/>
+      <circle cx="52" cy="32" r="6.5" fill="currentColor"/>
+      <circle cx="49" cy="39" r="6" fill="currentColor"/>
+      <circle cx="42" cy="42" r="5.5" fill="currentColor"/>
+      <!-- head with open jaw and tongue -->
+      <ellipse cx="38" cy="26" rx="10" ry="9" fill="currentColor"/>
+      <path d="M30 20 L21 22 L22 28 L31 29 Z" fill="currentColor" stroke="currentColor" stroke-width="3"/>
+      <path d="M31 32 L23 33 L26 37 L35 36 Z" fill="currentColor" stroke="currentColor" stroke-width="2.4"/>
+      <path d="M24 30.5 C20 30 18 32 17 34" fill="none" stroke="currentColor" stroke-width="2.2"/>
+      <!-- crown -->
+      <path d="M31 13 L29 3 L34.5 8 L38.5 0.5 L42.5 8 L48 3 L46 13 Z" fill="currentColor"/>
+    </g>
+  </defs>
+  <!-- milled edge and outer ring -->
+  <circle cx="32" cy="32" r="31" fill="#8A5F16"/>
+  <circle cx="32" cy="32" r="30.2" fill="url(#ring)"/>
+  <circle cx="32" cy="32" r="28.6" fill="none" stroke="#FFF2C9" stroke-opacity="0.55" stroke-width="0.8" stroke-dasharray="1.2 1.6"/>
+  <!-- inner disc -->
+  <circle cx="32" cy="32" r="22.4" fill="#7E4320"/>
+  <circle cx="32" cy="32" r="21.6" fill="url(#core)"/>
+  <!-- embossed lion: shadow + relief -->
+  <g transform="translate(7.6 9.6) scale(0.44)">
+    <use href="#lion" color="#6B3313" transform="translate(2.2 2.2)"/>
+    <use href="#lion" color="#FCE3B4"/>
+    <circle cx="34" cy="23.5" r="1.7" fill="#8A4A22"/>
+    <g fill="none" stroke="#C98450" stroke-width="1.6" stroke-linecap="round">
+      <path d="M41 14 C45 16 46 20 45 23 M47 22 C50 25 50 29 48 31 M48 32 C50 35 49 38 46 39 M42 37 C43 40 42 42 40 43"/>
+      <path d="M58 64 C63 62 69 64 71 69"/>
+      <path d="M47 46 C44 50 44 54 46 57"/>
+    </g>
+  </g>
+  <!-- highlight -->
+  <path d="M10 22 A23 23 0 0 1 26 8" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

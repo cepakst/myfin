@@ -154,7 +154,7 @@ const rng = (sheet: string, letter: string, first: number, last: number) => `'${
 
 export async function buildTaxReport({ year, snapshot: s, ledger, fx, settings }: TaxReportInput): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'My finance';
+  wb.creator = 'Myfin';
   wb.created = new Date();
   wb.calcProperties.fullCalcOnLoad = true;
   const rates = new RateBook(fx);
@@ -396,7 +396,7 @@ export async function buildTaxReport({ year, snapshot: s, ledger, fx, settings }
   wsSum.getColumn(1).width = 64;
   wsSum.getColumn(2).width = 18;
   wsSum.getColumn(3).width = 70;
-  title(wsSum, `Podklady k daňovému přiznání za rok ${year}`, `Vygenerováno aplikací My finance ${new Date().toLocaleString('cs-CZ')}${s.demo ? ' – DEMO DATA (smyšlené portfolio)' : ''}`);
+  title(wsSum, `Podklady k daňovému přiznání za rok ${year}`, `Vygenerováno aplikací Myfin ${new Date().toLocaleString('cs-CZ')}${s.demo ? ' – DEMO DATA (smyšlené portfolio)' : ''}`);
   const section = (text: string) => {
     wsSum.addRow([]);
     const r = wsSum.addRow([text]);

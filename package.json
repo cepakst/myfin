@@ -2,7 +2,7 @@
   "name": "myfin",
   "version": "1.0.0",
   "private": true,
-  "description": "My Finance – lokální aplikace pro přehled investic, výnosů a daní (Degiro, XTB)",
+  "description": "Myfin – lokální aplikace pro přehled investic, výnosů a daní (Degiro, XTB)",
   "type": "module",
   "main": "dist/electron/main.js",
   "author": "cepakst",
@@ -18,6 +18,7 @@
     "electron": "npm run build && npm run build:electron && electron .",
     "dist:win": "npm run build && npm run build:electron && electron-builder --win nsis",
     "dist:mac": "npm run build && npm run build:electron && electron-builder --mac dmg zip --arm64 --x64",
+    "icons": "tsx scripts/generate-icons.ts",
     "demo:generate": "tsx scripts/generate-demo.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -26,7 +27,7 @@
   },
   "build": {
     "appId": "cz.cepakst.myfin",
-    "productName": "My finance",
+    "productName": "Myfin",
     "directories": {
       "output": "dist-electron"
     },
@@ -55,7 +56,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "My finance"
+      "shortcutName": "Myfin"
     }
   },
   "engines": {

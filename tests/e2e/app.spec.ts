@@ -43,6 +43,20 @@ test.describe('app smoke', () => {
     expect(foreignRequests).toEqual([]);
   });
 
+  test('header shows the brand and the app icons are served', async ({ page }) => {
+    await page.goto('/#/dane');
+    const brand = page.locator('header').getByTestId('brand');
+    await expect(brand).toContainText('Myfin');
+    await expect(brand).toContainText('Moje finance přehledně');
+    expect(await brand.locator('img').evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
+    expect((await page.locator('header').boundingBox())!.height).toBeLessThanOrEqual(57);
+    await brand.click();
+    await expect(page).toHaveURL(/#\/$/);
+    for (const href of await page.locator('link[rel~="icon"], link[rel="apple-touch-icon"]').evaluateAll((ls) => ls.map((l) => (l as HTMLLinkElement).href)))
+      expect((await page.request.get(href)).status(), href).toBe(200);
+    expect((await page.request.get('/icon-256.png')).status()).toBe(200);
+  });
+
   test('taxes page shows synthetic 2024 data', async ({ page }) => {
     await page.goto('/#/dane');
     await selectYear(page, 2024);

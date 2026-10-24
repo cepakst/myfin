@@ -1,4 +1,4 @@
-# My finance
+# Myfin – moje finance přehledně
 
 Lokální aplikace pro přehled investic a daní z exportů brokerů **Degiro** a **XTB**.
 
@@ -41,8 +41,8 @@ Pokud macOS při prvním dvojkliku na `start.command` hlásí, že jej nelze ote
 
 ```bash
 npm run electron     # sestaví a spustí v okně aplikace
-npm run dist:win     # Windows: instalátor dist-electron\My finance Setup 1.0.0.exe
-npm run dist:mac     # macOS: dist-electron/My finance-1.0.0-mac-arm64.dmg a -x64.dmg (+ .zip)
+npm run dist:win     # Windows: instalátor dist-electron\Myfin Setup 1.0.0.exe
+npm run dist:mac     # macOS: dist-electron/Myfin-1.0.0-mac-arm64.dmg a -x64.dmg (+ .zip)
 ```
 
 Instalátor pro macOS lze sestavit jen na Macu. Aplikace není podepsaná, proto ji při prvním spuštění otevřete pravým tlačítkem → **Otevřít** (případně povolte v *Nastavení systému → Soukromí a zabezpečení*).
