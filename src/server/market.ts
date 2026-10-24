@@ -63,6 +63,8 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>): Prom
   );
 }
 
+const CHART_START = '2000-01-01';
+
 async function fetchChart(symbol: string, from: string): Promise<PriceSeries | null> {
   const r = (await yf.chart(symbol, { period1: from, interval: '1d', events: 'split' } as never)) as unknown as {
     meta: { currency?: string };
@@ -135,7 +137,8 @@ export class MarketData {
       return cached;
     }
     try {
-      const s = await fetchChart(symbol, from);
+      // fixed start date – never send the user's trade dates to the provider (AGENTS.md rule 3)
+      const s = await fetchChart(symbol, from < CHART_START ? from.slice(0, 4) + '-01-01' : CHART_START);
       if (s) {
         writeFileSync(file, JSON.stringify(s));
         this.series.set(symbol, s);
