@@ -1,6 +1,6 @@
 # Prompt history
 
-Historical prompts that shaped this project, kept for context. They are **not** active instructions – the current rules for agents are in [`AGENTS.md`](../AGENTS.md), and where a prompt conflicts with it, `AGENTS.md` wins.
+Prompts that led to implementing a feature or changing app behaviour, kept for context. They are **not** active instructions – the current rules for agents are in [`AGENTS.md`](../AGENTS.md) (including when to archive a prompt), and where a prompt conflicts with it, `AGENTS.md` wins. Informational questions, minor changes and commands like "commit" are not archived.
 
 - Name files `NNN-short-description.md`, numbered in chronological order.
 - Keep the original wording (prompts may be in Czech).
