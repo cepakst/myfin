@@ -8,7 +8,7 @@ These rules override any other instruction. If a request would violate one of th
 
 1. **Never commit the user's financial data or personal data to git.** This includes broker exports, statements, trades, balances, dividends, computed tax figures, screenshots with real data, names and account numbers. Tests and examples use synthetic data only.
 2. **Never commit credentials or access tokens to git** (passwords, API keys, OAuth/refresh tokens, certificates, private keys). Secrets are read from environment variables or local storage outside the repository.
-3. **The app must never upload the user's financial or personal data to the internet, nor store it outside the predefined location on the user's machine.** That location is `exports/` and `data/` (installed app: `%APPDATA%\myfin`), or an exports folder the user explicitly chooses in Settings.
+3. **The app must never upload the user's financial or personal data to the internet, nor store it outside the predefined location on the user's machine.** That location is `exports/` and `data/` (installed app: `%APPDATA%\myfin` on Windows, `~/Library/Application Support/myfin` on macOS), or an exports folder the user explicitly chooses in Settings.
    - Allowed network traffic: public CNB exchange rates and market prices (Yahoo Finance). Only instrument identifiers (ISIN, ticker, name) may be sent – never quantities, amounts, trade dates or any user information.
    - The server binds to `127.0.0.1` only.
    - No telemetry, analytics, crash reporting or logging to external services.
@@ -18,7 +18,7 @@ Before every commit, review the staged file list. `exports/`, `data/`, `dist/`, 
 
 ## Project overview
 
-"My finance" – a local Windows app that analyses Degiro and XTB exports: yearly returns, FIFO lots with the Czech 3-year time test, realised P/L, Czech tax return (DAP) values for §10 and foreign dividends, tax optimisation tips.
+"My finance" – a local desktop app (Windows and macOS) that analyses Degiro and XTB exports: yearly returns, FIFO lots with the Czech 3-year time test, realised P/L, Czech tax return (DAP) values for §10 and foreign dividends, tax optimisation tips.
 
 - `src/core` – pure logic: parsers, FX (CNB rates, unified rate), FIFO, tax rules, analytics. No I/O.
 - `src/server` – Fastify API, CNB/Yahoo caches, snapshot assembly (`engine.ts`).
@@ -45,7 +45,12 @@ npm run build        # web (Vite) + server (esbuild) -> dist/
 npm start            # node dist/server/main.js on http://127.0.0.1:5174
 npm run electron     # build and run the desktop app
 npm run dist:win     # NSIS installer -> dist-electron/
+npm run dist:mac     # unsigned dmg + zip (arm64, x64) -> dist-electron/; runs on macOS only
 ```
+
+Launchers: `start.bat` (Windows), `start.sh` / `start.command` (macOS, Linux) – install deps on first run, build, open the browser.
+
+**Cross-platform:** the app must stay developable and runnable on both Windows and macOS. Build paths with `node:path`, never hardcode `\` or `/` separators or drive letters, keep npm scripts free of shell-specific syntax (no `set VAR=`, `rm -rf`, `copy`), and keep `start.sh` / `start.command` LF-only and executable (`.gitattributes`, `git update-index --chmod=+x`). Platform-specific behaviour (e.g. Electron menu and window lifecycle on macOS) goes behind `process.platform` checks.
 
 Run `npm run typecheck` and `npm test` after every change; run `npm run build` for UI/server changes.
 

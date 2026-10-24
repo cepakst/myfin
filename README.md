@@ -17,19 +17,28 @@ Daňovou situaci (OSVČ, OSVČ v paušálním režimu, zaměstnanec, bez jiných
 
 ## Spuštění
 
-Potřebujete [Node.js](https://nodejs.org) 22 nebo novější.
+Potřebujete [Node.js](https://nodejs.org) 22 nebo novější (na macOS např. `brew install node`).
 
-1. Spusťte **`start.bat`**. Při prvním spuštění se nainstalují závislosti, pak se aplikace sestaví a otevře v prohlížeči na <http://127.0.0.1:5174>.
+1. Spusťte aplikaci:
+   - **Windows:** `start.bat`
+   - **macOS:** dvojklik na `start.command` ve Finderu, nebo v Terminálu `./start.sh`
+
+   Při prvním spuštění se nainstalují závislosti, pak se aplikace sestaví a otevře v prohlížeči na <http://127.0.0.1:5174>.
 2. V sekci **Nastavení a data** nahrajte exporty nebo je vložte do složky `exports/`.
+
+Pokud macOS při prvním dvojkliku na `start.command` hlásí, že jej nelze otevřít, klikněte na soubor pravým tlačítkem a zvolte **Otevřít**. Chybí-li souboru právo ke spuštění (např. po stažení ZIP z GitHubu), spusťte jednou `chmod +x start.sh start.command`.
 
 ### Desktopová aplikace (Electron)
 
 ```bash
 npm run electron     # sestaví a spustí v okně aplikace
-npm run dist:win     # instalátor dist-electron\My finance Setup 1.0.0.exe
+npm run dist:win     # Windows: instalátor dist-electron\My finance Setup 1.0.0.exe
+npm run dist:mac     # macOS: dist-electron/My finance-1.0.0-mac-arm64.dmg a -x64.dmg (+ .zip)
 ```
 
-Nainstalovaná aplikace ukládá exporty, nastavení a cache do `%APPDATA%\myfin` (podsložky `exports` a `data`).
+Instalátor pro macOS lze sestavit jen na Macu. Aplikace není podepsaná, proto ji při prvním spuštění otevřete pravým tlačítkem → **Otevřít** (případně povolte v *Nastavení systému → Soukromí a zabezpečení*).
+
+Nainstalovaná aplikace ukládá exporty, nastavení a cache do `%APPDATA%\myfin` (Windows) nebo `~/Library/Application Support/myfin` (macOS), vždy v podsložkách `exports` a `data`.
 
 ### Exporty
 
@@ -42,7 +51,7 @@ Nový export stejného typu nahradí předchozí. Starý se přesune do `exports
 
 ## Soukromí
 
-- Všechna data zůstávají v počítači, ve složkách `exports/` a `data/` (u nainstalované aplikace v `%APPDATA%\myfin`). Obě složky jsou v `.gitignore`.
+- Všechna data zůstávají v počítači, ve složkách `exports/` a `data/` (u nainstalované aplikace v `%APPDATA%\myfin`, na macOS v `~/Library/Application Support/myfin`). Obě složky jsou v `.gitignore`.
 - Server poslouchá jen na `127.0.0.1`.
 - Z internetu se stahují pouze kurzy ČNB a historické ceny z Yahoo Finance; posílají se jen ISIN, tickery a názvy instrumentů.
 

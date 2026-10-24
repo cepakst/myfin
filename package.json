@@ -17,6 +17,7 @@
     "start": "node dist/server/main.js",
     "electron": "npm run build && npm run build:electron && electron .",
     "dist:win": "npm run build && npm run build:electron && electron-builder --win nsis",
+    "dist:mac": "npm run build && npm run build:electron && electron-builder --mac dmg zip --arm64 --x64",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -35,6 +36,18 @@
     ],
     "win": {
       "target": "nsis"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.finance",
+      "identity": null,
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "${productName} ${version}"
     },
     "nsis": {
       "oneClick": false,

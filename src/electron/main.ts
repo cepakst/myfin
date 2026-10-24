@@ -9,14 +9,15 @@ let win: BrowserWindow | null = null;
 
 function configurePaths() {
   if (app.isPackaged) {
-    // Data live in %APPDATA%\My finance, the web UI is bundled inside the app archive.
+    // Data live in the OS user-data dir (Windows: %APPDATA%\myfin, macOS: ~/Library/Application Support/myfin),
+    // the web UI is bundled inside the app archive.
     const userDir = app.getPath('userData');
     process.env.MYFIN_ROOT ??= userDir;
     process.env.MYFIN_DATA ??= join(userDir, 'data');
     process.env.MYFIN_EXPORTS ??= join(userDir, 'exports');
     process.env.MYFIN_WEB_DIST ??= join(app.getAppPath(), 'dist', 'web');
   }
-  // Unpackaged: paths.ts resolves the project root (data/ and exports/ shared with start.bat).
+  // Unpackaged: paths.ts resolves the project root (data/ and exports/ shared with start.bat / start.sh).
 }
 
 async function startServer(): Promise<string> {
@@ -26,7 +27,7 @@ async function startServer(): Promise<string> {
     return await (await createServer()).start(DEFAULT_PORT);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw e;
-    // Another instance (e.g. start.bat) holds the default port – use a free one.
+    // Another instance (e.g. start.bat / start.sh) holds the default port – use a free one.
     return await (await createServer()).start(0);
   }
 }
@@ -57,18 +58,37 @@ async function createWindow(url: string) {
 }
 
 app.on('second-instance', () => {
-  if (!win) return;
+  if (!win) {
+    if (serverUrl) void createWindow(serverUrl);
+    return;
+  }
   if (win.isMinimized()) win.restore();
   win.focus();
 });
 
-app.on('window-all-closed', () => app.quit());
+const isMac = process.platform === 'darwin';
+let serverUrl: string | null = null;
+
+// macOS convention: the app keeps running without windows until Cmd+Q.
+app.on('window-all-closed', () => {
+  if (!isMac) app.quit();
+});
+
+app.on('activate', () => {
+  if (!win && serverUrl) void createWindow(serverUrl);
+});
 
 app.whenReady().then(async () => {
-  Menu.setApplicationMenu(null);
+  // macOS needs an application menu, otherwise Cmd+C/V/Q and other standard shortcuts do not work.
+  Menu.setApplicationMenu(
+    isMac
+      ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }])
+      : null,
+  );
   configurePaths();
   try {
-    await createWindow(await startServer());
+    serverUrl = await startServer();
+    await createWindow(serverUrl);
   } catch (e) {
     dialog.showErrorBox('My finance', `Server se nepodařilo spustit:\n${(e as Error).stack ?? e}`);
     app.quit();
