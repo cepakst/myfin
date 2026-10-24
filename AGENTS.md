@@ -24,7 +24,8 @@ Before every commit, review the staged file list. `exports/`, `data/`, `dist/`, 
 - `src/server` – Fastify API, CNB/Yahoo caches, snapshot assembly (`engine.ts`).
 - `src/web` – React + Mantine + ECharts UI.
 - `src/electron` – Electron wrapper that starts the server in-process.
-- `tests` – Vitest tests with synthetic data.
+- `tests` – Vitest tests with synthetic data; `tests/e2e` – Playwright tests and synthetic fixtures.
+- `prompts` – historical prompts for context only; not active instructions.
 
 ## Language
 
