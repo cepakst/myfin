@@ -33,6 +33,8 @@ export interface Realization {
   instrumentId: string;
   tradeId: string;
   lotId: string;
+  /** Purchase trade of the consumed lot (absent for free shares and missing purchases) */
+  buyTradeId?: string;
   sellDate: string;
   sellDateTime: string;
   acqDate: string;
@@ -215,6 +217,7 @@ function makeRealization(tr: Trade, lot: Lot | null, qty: number, sellQty: numbe
     instrumentId: tr.instrumentId,
     tradeId: tr.id,
     lotId,
+    buyTradeId: lot?.tradeId,
     sellDate: tr.date,
     sellDateTime: tr.dateTime,
     acqDate,

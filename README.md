@@ -13,6 +13,15 @@ Lokální aplikace pro přehled investic a daní z exportů brokerů **Degiro** 
 
 Daňovou situaci (OSVČ, OSVČ v paušálním režimu, zaměstnanec, bez jiných příjmů), jiný základ daně, zdanění dividend a přepočet měn lze nastavit zvlášť pro každý rok přímo v sekci **Daně**. Tabulka **Porovnání variant** ukazuje odhad daně pro každou kombinaci kurzu a zdanění dividend a označí nejvýhodnější.
 
+Tlačítko **Stáhnout podklady (Excel)** v sekci Daně vytvoří pro zvolený rok sešit, který ukazuje, jak aplikace k částkám došla (např. pro kontrolu nebo dotaz finančního úřadu). Výpočty jsou v něm uvedeny jako vzorce Excelu, takže je lze dohledat buňku po buňce:
+
+- **Souhrn** – zvolené nastavení a výpočet ř. 207–209 a Přílohy č. 4 ze součtů podrobných listů,
+- **Prodeje CP** – každý prodej rozdělený na nakoupené loty (FIFO): kurzy, příjem, výdaje, poplatky, časový test a daňové zařazení,
+- **Dividendy** (a **Úroky**) – hrubá částka, sražená daň, smluvní sazba a započitatelná daň, souhrn podle států,
+- **Kurzy** – všechny použité kurzy a jejich zdroj,
+- **DAP** – hodnoty do přiznání tak, jak je ukazuje aplikace.
+
+Soubor obsahuje vaše finanční údaje – sdílejte ho jen s tím, komu ho chcete ukázat.
 > ⚠️ Aplikace je pomůcka, ne daňové poradenství. Před podáním přiznání si výsledky ověřte.
 
 ## Spuštění

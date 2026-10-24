@@ -83,6 +83,8 @@ export interface EngineState {
   market?: MarketData;
   prices?: PriceProvider;
   fx?: FxRates;
+  /** Settings the current snapshot was computed with */
+  settings?: Settings;
 }
 
 export const state: EngineState = { status: 'idle', progress: [] };
@@ -344,6 +346,7 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
     state.market = market;
     state.prices = prices;
     state.fx = fx;
+    state.settings = settings;
     state.status = 'ready';
     log('Hotovo');
   } catch (e) {

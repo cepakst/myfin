@@ -1,4 +1,5 @@
-import { Alert, Anchor, Badge, Group, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Group, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
+import { IconFileSpreadsheet } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Snapshot } from '../api';
@@ -67,6 +68,11 @@ export function TaxesPage({ s }: { s: Snapshot }) {
       <Group justify="space-between">
         <Group>
           <YearSelect years={s.years} value={year} onChange={setYear} />
+          <WithHint label="Excel s podrobným rozpisem výpočtu: jednotlivé prodeje (párování FIFO, kurzy, časový test), dividendy se zápočtem daně, použité kurzy a řádky přiznání odvozené vzorci. Hodí se pro kontrolu nebo dotaz finančního úřadu.">
+            <Button component="a" href={`/api/tax-report/${year}`} download variant="light" leftSection={<IconFileSpreadsheet size={16} />} data-testid="tax-report">
+              Stáhnout podklady (Excel)
+            </Button>
+          </WithHint>
         </Group>
         {sum.mustFile != null && (
           <WithHint label={sum.filingReason ?? ''}>

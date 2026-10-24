@@ -8,6 +8,7 @@ import { mergeSettings, type Settings } from '../core/settings.js';
 import { computeSnapshot, instrumentDetail, state } from './engine.js';
 import { DEFAULT_EXPORTS_DIR, DEMO_SETTINGS_FILE, ensureDir, WEB_DIST } from './paths.js';
 import { loadSettings, saveSettings } from './store.js';
+import { buildTaxReport } from './taxReport.js';
 
 export async function createServer() {
   // `settings` = the user's settings (incl. the demo flag); demo mode edits a separate settings file
@@ -46,6 +47,19 @@ export async function createServer() {
   });
 
   app.get('/api/settings', async () => ({ settings: active(), defaultExportsDir: DEFAULT_EXPORTS_DIR, demo: !!settings.demo }));
+
+  app.get<{ Params: { year: string } }>('/api/tax-report/:year', async (req, reply) => {
+    const snap = state.snapshot;
+    if (!snap || !state.ledger || !state.fx || !state.settings) return reply.code(503).send({ error: 'Data se ještě načítají' });
+    const year = Number(req.params.year);
+    if (!Number.isInteger(year) || !snap.years.includes(year)) return reply.code(404).send({ error: 'Rok není k dispozici' });
+    const buf = await buildTaxReport({ year, snapshot: snap, ledger: state.ledger, fx: state.fx, settings: state.settings });
+    return reply
+      .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('Content-Disposition', `attachment; filename="myfin-dane-${year}${snap.demo ? '-demo' : ''}.xlsx"`)
+      .header('Cache-Control', 'no-store')
+      .send(buf);
+  });
 
   app.put<{ Body: Partial<Settings> }>('/api/settings', async (req) => {
     // the demo flag is switched only via /api/demo; demo settings never carry an exports folder

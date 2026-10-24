@@ -21,7 +21,7 @@ Before every commit, review the staged file list. `exports/`, `data/`, `dist/`, 
 "My finance" – a local desktop app (Windows and macOS) that analyses Degiro and XTB exports: yearly returns, FIFO lots with the Czech 3-year time test, realised P/L, Czech tax return (DAP) values for §10 and foreign dividends, tax optimisation tips.
 
 - `src/core` – pure logic: parsers, FX (CNB rates, unified rate), FIFO, tax rules, analytics. No I/O.
-- `src/server` – Fastify API, CNB/Yahoo caches, snapshot assembly (`engine.ts`).
+- `src/server` – Fastify API, CNB/Yahoo caches, snapshot assembly (`engine.ts`). `taxReport.ts` builds the per-year Excel audit workbook (`GET /api/tax-report/:year`) with Excel formulas whose cached results must equal the app's values; `tests/taxReport.test.ts` recalculates every formula and compares it with the DAP rows, so keep both in sync when tax logic changes.
 - `src/web` – React + Mantine + ECharts UI.
 - `src/electron` – Electron wrapper that starts the server in-process.
 - `tests` – Vitest tests with synthetic data; `tests/e2e` – Playwright tests and synthetic fixtures.
