@@ -34,6 +34,8 @@ export interface YearTaxSummary {
   estimatedTaxDividendsGeneralCzk: number;
   estimatedTaxTotalCzk: number;
   mustFile: boolean | null;
+  /** Explanation of the filing obligation for the selected situation */
+  filingReason: string | null;
   notes: TaxNote[];
 }
 
@@ -106,6 +108,7 @@ export function yearTaxSummary(settings: Settings, sec: SecuritiesYearReport, di
       }
       break;
   }
+  const filingReason = notes[0]?.text ?? null;
 
   if (sec.smallSalesExempt && sec.limitProceedsCzk > 0)
     notes.push({ severity: 'info', text: `Příjmy z prodeje CP bez časového testu (${fmt(sec.limitProceedsCzk)}) nepřesáhly ${fmt(SMALL_SALES_LIMIT)} – jsou osvobozeny (§4/1/t) a do přiznání se neuvádějí.` });
@@ -127,10 +130,10 @@ export function yearTaxSummary(settings: Settings, sec: SecuritiesYearReport, di
     if (use16a && diff > 200)
       notes.push({
         severity: 'warning',
-        text: `Bez volby §16a by daň ze zahraničních dividend činila odhadem ${fmt(divGeneral)} místo ${fmt(div16a)}${noIncome ? ' (v obecném základu je pokryje sleva na poplatníka)' : ''}. Volbu lze změnit v Nastavení.`,
+        text: `Bez volby §16a by daň ze zahraničních dividend činila odhadem ${fmt(divGeneral)} místo ${fmt(div16a)}${noIncome ? ' (v obecném základu je pokryje sleva na poplatníka)' : ''}. Volbu lze změnit v sekci Daně.`,
       });
     else if (!use16a && diff < -200)
-      notes.push({ severity: 'warning', text: `Při volbě §16a (Příloha č. 4) by daň ze zahraničních dividend činila odhadem ${fmt(div16a)} místo ${fmt(divGeneral)}. Volbu lze změnit v Nastavení.` });
+      notes.push({ severity: 'warning', text: `Při volbě §16a (Příloha č. 4) by daň ze zahraničních dividend činila odhadem ${fmt(div16a)} místo ${fmt(divGeneral)}. Volbu lze změnit v sekci Daně.` });
   }
 
   return {
@@ -152,6 +155,7 @@ export function yearTaxSummary(settings: Settings, sec: SecuritiesYearReport, di
     estimatedTaxDividendsGeneralCzk: divGeneral,
     estimatedTaxTotalCzk: estSec + estDiv,
     mustFile,
+    filingReason,
     notes,
   };
 }

@@ -1,8 +1,10 @@
-import { Alert, Badge, Group, SimpleGrid, Stack, Table, Text } from '@mantine/core';
+import { Alert, Anchor, Badge, Group, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Snapshot } from '../api';
-import { CopyValue, Section, Stat, YearSelect } from '../components';
+import { CopyValue, defaultYear, Section, Stat, WithHint, YearSelect } from '../components';
 import { czk } from '../format';
+import { TaxYearSettings } from './TaxYearSettings';
 
 export function DapBlocks({ blocks }: { blocks: Snapshot['dap'][number]['blocks'] }) {
   return (
@@ -52,10 +54,11 @@ export function DapBlocks({ blocks }: { blocks: Snapshot['dap'][number]['blocks'
 }
 
 export function TaxesPage({ s }: { s: Snapshot }) {
-  const [year, setYear] = useState(s.years.at(-1)! - (s.years.length > 1 ? 1 : 0));
+  const [year, setYear] = useState(defaultYear(s));
   const sec = s.securities.find((x) => x.year === year)!;
   const sum = s.taxSummaries.find((x) => x.year === year)!;
   const dap = s.dap.find((x) => x.year === year)!;
+  const div = s.dividendYears.find((x) => x.year === year)!;
   const fxY = s.fxYears.find((x) => x.year === year);
   const provisional = fxY?.rates.some((r) => r.provisional && fxY.method === 'UNIFIED');
 
@@ -64,24 +67,16 @@ export function TaxesPage({ s }: { s: Snapshot }) {
       <Group justify="space-between">
         <Group>
           <YearSelect years={s.years} value={year} onChange={setYear} />
-          <Badge size="lg" variant="light">
-            {sum.situationLabel}
-          </Badge>
-          <Badge size="lg" variant="outline">
-            kurz: {fxY?.method === 'DAILY' ? 'denní ČNB' : 'jednotný'}
-          </Badge>
-          {sum.foreignDividendsCzk > 0 && (
-            <Badge size="lg" variant="outline" color="grape">
-              dividendy: {sum.use16a ? '§16a (Příloha č. 4)' : 'obecný základ (Příloha č. 3)'}
-            </Badge>
-          )}
         </Group>
         {sum.mustFile != null && (
-          <Badge size="lg" color={sum.mustFile ? 'orange' : 'teal'}>
-            {sum.mustFile ? 'Daňové přiznání podat' : 'Přiznání není nutné'}
-          </Badge>
+          <WithHint label={sum.filingReason ?? ''}>
+            <Badge size="lg" color={sum.mustFile ? 'orange' : 'teal'}>
+              {sum.mustFile ? 'Daňové přiznání podat' : 'Přiznání není nutné'}
+            </Badge>
+          </WithHint>
         )}
       </Group>
+      <TaxYearSettings s={s} year={year} />
       {provisional && (
         <Alert color="yellow">Rok ještě neskončil nebo GFŘ dosud nevydalo jednotný kurz – použit předběžný průměr měsíčních kurzů ČNB. Hodnoty se mohou změnit.</Alert>
       )}
@@ -91,19 +86,39 @@ export function TaxesPage({ s }: { s: Snapshot }) {
         </Alert>
       ))}
       <SimpleGrid cols={{ base: 2, md: 4 }}>
-        <Stat label="Příjmy z prodeje CP" value={czk(sec.totalProceedsCzk)} sub={`z toho časový test ${czk(sec.timeTestProceedsCzk)}`} />
-        <Stat label="Pro limit 100 000 Kč" value={czk(sec.limitProceedsCzk)} sub={sec.smallSalesExempt ? 'v limitu – osvobozeno' : 'limit překročen'} color={sec.smallSalesExempt ? 'teal' : 'orange'} />
-        <Stat label="Základ daně §10" value={czk(sec.taxable.baseCzk)} sub={`zisky ${czk(sec.taxable.gainsCzk)} / ztráty ${czk(-sec.taxable.lossesCzk)}`} />
+        <Stat
+          label="Příjmy z prodeje CP"
+          value={czk(sec.totalProceedsCzk)}
+          sub={`z toho časový test ${czk(sec.timeTestProceedsCzk)}`}
+          hint="Úhrn prodejních cen všech cenných papírů prodaných v roce, včetně prodejů osvobozených časovým testem (držení déle než 3 roky)."
+        />
+        <Stat
+          label="Pro limit 100 000 Kč"
+          value={czk(sec.limitProceedsCzk)}
+          sub={sec.smallSalesExempt ? 'v limitu – osvobozeno' : 'limit překročen'}
+          color={sec.smallSalesExempt ? 'teal' : 'orange'}
+          hint="Příjmy z prodejů bez splněného časového testu. Pokud za rok nepřesáhnou 100 000 Kč, jsou všechny osvobozeny (§4 odst. 1 písm. t ZDP). Rozhoduje příjem (prodejní cena), ne zisk."
+        />
+        <Stat
+          label="Základ daně §10"
+          value={czk(sec.taxable.baseCzk)}
+          sub={`zisky ${czk(sec.taxable.gainsCzk)} / ztráty ${czk(-sec.taxable.lossesCzk)}`}
+          hint="Dílčí základ daně z ostatních příjmů (Příloha č. 2): zdanitelné příjmy − výdaje (nákupní cena a poplatky). Ztráty se započtou jen proti ziskům ze CP v tomtéž roce; záporný výsledek = 0 Kč."
+        />
         <Stat
           label="Odhad daně celkem"
           value={czk(sum.estimatedTaxTotalCzk)}
           sub={`CP ${czk(sum.estimatedTaxSecuritiesCzk)} · dividendy ${czk(sum.estimatedTaxDividendsCzk)}${sum.year >= 2021 && sum.foreignDividendsCzk > 0 ? ` (${sum.use16a ? 'bez §16a' : 's §16a'} ${czk(sum.use16a ? sum.estimatedTaxDividendsGeneralCzk : sum.estimatedTaxDividends16aCzk)})` : ''}`}
+          hint="Odhad daně, kterou investice přidají k vaší dani z ostatních příjmů (15 %, nad limit 23 %), po zápočtu daně sražené v zahraničí. Závisí na „jiném základu daně“ zadaném v Nastavení."
         />
       </SimpleGrid>
       <Text size="sm" c="dimmed">
         Hodnoty k přepsání do daňového přiznání (tlačítkem zkopírujete celé číslo v Kč). Výpočet: FIFO, výdaje = pořizovací cena + poplatky při nákupu i prodeji, přepočet {fxY?.method === 'DAILY' ? 'denním kurzem ČNB' : 'jednotným kurzem'}.
       </Text>
-      <DapBlocks blocks={dap.blocks} />
+      <Title order={4} mt="sm">
+        Cenné papíry (§10)
+      </Title>
+      <DapBlocks blocks={dap.blocks.slice(0, 1)} />
       <Section title="Osvobozené prodeje">
         <Table fz="sm">
           <Table.Tbody>
@@ -122,6 +137,24 @@ export function TaxesPage({ s }: { s: Snapshot }) {
           </Table.Tbody>
         </Table>
       </Section>
+      <Group mt="sm" gap="xs">
+        <Title order={4}>Dividendy a kapitálové příjmy (§8)</Title>
+        <Anchor component={Link} to="/dividendy" size="sm">
+          rozpis po státech a výplatách →
+        </Anchor>
+      </Group>
+      <SimpleGrid cols={{ base: 2, md: 4 }}>
+        <Stat label="Zahraniční dividendy hrubě" value={czk(div.foreign.grossCzk)} hint="Hrubé zahraniční dividendy přepočtené kurzem zvoleným pro daňové účely – částka do přiznání." />
+        <Stat label="Sražená daň v zahraničí" value={czk(div.foreign.withheldCzk)} sub={`započitatelná ${czk(div.foreign.creditableCzk)}`} hint="Zahraniční daň lze započíst nejvýše do smluvní sazby (obvykle 15 %)." />
+        <Stat label="Doplatek daně v ČR" value={czk(div.foreign.dueCzk)} hint="Česká daň 15 % po zápočtu zahraniční daně." />
+        <Stat
+          label="Lze žádat v zahraničí"
+          value={czk(div.foreign.reclaimableCzk)}
+          color={div.foreign.reclaimableCzk > 0 ? 'orange' : undefined}
+          hint="Daň sražená nad smluvní sazbu – v ČR ji započíst nelze, o vrácení se žádá v zahraničí."
+        />
+      </SimpleGrid>
+      <DapBlocks blocks={dap.blocks.slice(1)} />
       <Text size="xs" c="dimmed">
         Aplikace slouží jako podklad, nikoli jako daňové poradenství. Před podáním si ověřte aktuální tiskopis a pokyny Finanční správy.
       </Text>

@@ -1,24 +1,17 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { selectYear, waitForSnapshot } from './helpers.js';
 
 const PAGES = [
   { label: 'Přehled', hash: '#/' },
   { label: 'Výnosy po letech', hash: '#/roky' },
   { label: 'Portfolio a loty', hash: '#/portfolio' },
   { label: 'Realizované obchody', hash: '#/obchody' },
-  { label: 'Daně – CP (§10)', hash: '#/dane' },
-  { label: 'Dividendy (§8)', hash: '#/dividendy' },
+  { label: 'Dividendy', hash: '#/dividendy' },
+  { label: 'Daně', hash: '#/dane' },
   { label: 'Daňová optimalizace', hash: '#/optimalizace' },
   { label: 'Zajímavosti', hash: '#/zajimavosti' },
   { label: 'Nastavení a data', hash: '#/nastaveni' },
 ];
-
-async function waitForSnapshot(page: Page) {
-  await expect
-    .poll(async () => (await (await page.request.get('/api/status')).json()).status, { timeout: 45_000 })
-    .toMatch(/ready|error/);
-  const status = await (await page.request.get('/api/status')).json();
-  expect(status.error ?? null).toBeNull();
-}
 
 test.describe('app smoke', () => {
   const errors: string[] = [];
@@ -41,7 +34,7 @@ test.describe('app smoke', () => {
   test('every page renders without errors', async ({ page }) => {
     await page.goto('/');
     for (const p of PAGES) {
-      await page.getByRole('link', { name: p.label }).click();
+      await page.getByRole('link', { name: p.label, exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`${p.hash.replace(/[/#]/g, '\\$&')}$`));
       await expect(page.getByText('Výpočet selhal')).toHaveCount(0);
       await expect(page.locator('main')).not.toBeEmpty();
@@ -52,17 +45,17 @@ test.describe('app smoke', () => {
 
   test('taxes page shows synthetic 2024 data', async ({ page }) => {
     await page.goto('/#/dane');
-    await page.getByRole('combobox', { name: 'Rok' }).click();
-    await page.getByRole('option', { name: '2024', exact: true }).click();
+    await selectYear(page, 2024);
     const main = page.locator('main');
     // BETA (held < 3 years) stays under the 100k limit (§4/1/t); ACME (bought 2020) passes the time test (§4/1/u).
     await expect(main).toContainText('nepřesáhly 100 000 Kč');
     await expect(main).toContainText('Prodeje se splněným časovým testem');
     await expect(main).toContainText('Příloha č. 4');
     await expect(main).toContainText('401a');
+    // Dividends must stay on the Taxes page (the duplicate tab was removed from Dividends only)
+    await expect(main.getByRole('heading', { name: 'Dividendy a kapitálové příjmy (§8)' })).toBeVisible();
     await page.goto('/#/obchody');
-    await page.getByRole('combobox', { name: 'Rok' }).click();
-    await page.getByRole('option', { name: '2024', exact: true }).click();
+    await selectYear(page, 2024);
     await expect(page.locator('main')).toContainText('BETA INC');
     expect(errors).toEqual([]);
   });

@@ -1,8 +1,9 @@
-import { Alert, Badge, Grid, Group, List, SimpleGrid, Stack, Text } from '@mantine/core';
+import { Alert, Anchor, Badge, Grid, Group, List, SimpleGrid, Stack, Text } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import type { Snapshot } from '../api';
 import { Chart, Section, Stat, tooltipCzk } from '../components';
 import { czk, date, pct, signColor } from '../format';
+import { missingMarketData } from '../marketStatus';
 
 export function OverviewPage({ s }: { s: Snapshot }) {
   const t = s.performance.total;
@@ -13,6 +14,10 @@ export function OverviewPage({ s }: { s: Snapshot }) {
   const top = open.slice(0, 12);
   const rest = open.slice(12).reduce((a, p) => a + (p.valueCzk ?? 0), 0);
   const curTax = s.taxSummaries.at(-1);
+  const missing = missingMarketData(s.instruments);
+  const heldIds = new Set(open.map((p) => p.instrumentId));
+  const missingHeld = missing.filter((i) => heldIds.has(i.id)).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  const missingOther = missing.length - missingHeld.length;
 
   return (
     <Stack>
@@ -99,7 +104,39 @@ export function OverviewPage({ s }: { s: Snapshot }) {
         </Section>
       )}
 
-      {(s.warnings.length > 0 || s.performance.missingPrices.length > 0) && (
+      {missingHeld.length + missingOther > 0 && (
+        <Alert color="orange" title={`Instrumenty bez tržních dat: ${missingHeld.length + missingOther}`}>
+          <Stack gap={4}>
+            <Text size="sm">
+              Pro tyto instrumenty se nepodařilo dohledat ověřený symbol Yahoo Finance. Cena se odhaduje z posledního obchodu nebo ocenění brokera, takže hodnota portfolia, výkonnost a ušlý potenciál mohou být nepřesné. Symbol doplníte v{' '}
+              <Anchor component={Link} to="/nastaveni" size="sm">
+                Nastavení a data
+              </Anchor>{' '}
+              (pomlčka „-“ = vědomě nepoužívat).
+            </Text>
+            {missingHeld.length > 0 && (
+              <Text size="sm">
+                Držené:{' '}
+                {missingHeld.map((i, idx) => (
+                  <span key={i.id}>
+                    {idx > 0 && ', '}
+                    <Anchor component={Link} to={`/instrument/${encodeURIComponent(i.id)}`} size="sm">
+                      {i.name}
+                    </Anchor>
+                  </span>
+                ))}
+              </Text>
+            )}
+            {missingOther > 0 && (
+              <Text size="sm" c="dimmed">
+                Další již prodané: {missingOther}
+              </Text>
+            )}
+          </Stack>
+        </Alert>
+      )}
+
+      {s.warnings.length > 0 && (
         <Alert color="yellow" title="Upozornění k datům">
           <List size="sm">
             {s.warnings.slice(0, 10).map((w, i) => (
@@ -107,7 +144,6 @@ export function OverviewPage({ s }: { s: Snapshot }) {
                 {w.source}: {w.message}
               </List.Item>
             ))}
-            {s.performance.missingPrices.length > 0 && <List.Item>Chybí ceny pro: {s.performance.missingPrices.join(', ')} (lze doplnit symbol v Nastavení)</List.Item>}
           </List>
         </Alert>
       )}

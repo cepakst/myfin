@@ -19,7 +19,7 @@ export interface PriceSeries {
 
 export interface SymbolInfo {
   symbol: string | null;
-  source: 'override' | 'auto' | 'none';
+  source: 'override' | 'auto' | 'none' | 'disabled';
   checkedAt: number;
   note?: string;
 }
@@ -181,12 +181,12 @@ export class MarketData {
    */
   async resolve(inst: Instrument, ref: Trade | undefined, override: string | undefined, firstDate: string): Promise<SymbolInfo> {
     if (override !== undefined) {
-      const info: SymbolInfo = { symbol: override || null, source: override ? 'override' : 'none', checkedAt: Date.now() };
+      const info: SymbolInfo = { symbol: override || null, source: override ? 'override' : 'disabled', checkedAt: Date.now() };
       this.symbols[inst.id] = info;
       return info;
     }
     const prev = this.symbols[inst.id];
-    if (prev && prev.source !== 'override' && (prev.symbol || Date.now() - prev.checkedAt < SYMBOL_RETRY_MS)) return prev;
+    if (prev && prev.source !== 'override' && prev.source !== 'disabled' && (prev.symbol || Date.now() - prev.checkedAt < SYMBOL_RETRY_MS)) return prev;
 
     const searchSyms: string[] = [];
     const cleanName = inst.name

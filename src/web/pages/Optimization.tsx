@@ -1,7 +1,7 @@
 import { Alert, Anchor, Stack, Text, Title } from '@mantine/core';
-import { DataTable } from 'mantine-datatable';
 import { Link } from 'react-router-dom';
 import type { Snapshot } from '../api';
+import { DataGrid } from '../DataGrid';
 import { czk, date, num, signColor } from '../format';
 
 export function OptimizationPage({ s }: { s: Snapshot }) {
@@ -16,10 +16,11 @@ export function OptimizationPage({ s }: { s: Snapshot }) {
           <Stack gap="xs">
             <Text size="sm">{t.text}</Text>
             {t.items && t.items.length > 0 && (
-              <DataTable
-                withTableBorder
+              <DataGrid
+                label={t.title}
                 fz="xs"
-                maxHeight={320}
+                maxHeight={360}
+                searchPlaceholder="Hledat instrument…"
                 idAccessor={(r) => r.lotId ?? r.instrumentId}
                 records={t.items}
                 columns={[
@@ -54,7 +55,7 @@ export function OptimizationPage({ s }: { s: Snapshot }) {
       ))}
       <Alert color="gray" title="Obecná pravidla">
         <Text size="sm">
-          • Časový test: prodej je osvobozen, pokud doba mezi nabytím a prodejem přesáhne 3 roky. • Limit 100 000 Kč: osvobozeny jsou prodeje, jejichž úhrnné příjmy (bez prodejů s časovým testem) za rok nepřesáhnou 100 000 Kč. • Ztráty z prodeje CP lze započíst jen proti ziskům ze CP ve stejném roce, nelze je převádět. • Metodu přepočtu (jednotný / denní kurz) lze volit pro každý rok.
+          • Časový test: prodej je osvobozen, pokud doba mezi nabytím a prodejem přesáhne 3 roky. • Limit 100 000 Kč: osvobozeny jsou prodeje, jejichž úhrnné příjmy (bez prodejů s časovým testem) za rok nepřesáhnou 100 000 Kč. • Ztráty z prodeje CP lze započíst jen proti ziskům ze CP ve stejném roce, nelze je převádět. • Metodu přepočtu (jednotný / denní kurz) lze volit pro každý rok. • Zahraniční dividendy lze od roku 2021 zdanit v samostatném základu §16a (15 %) nebo v obecném základu – volba platí vždy pro celý rok.
         </Text>
       </Alert>
     </Stack>

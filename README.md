@@ -4,13 +4,14 @@ Lokální aplikace pro přehled investic a daní z exportů brokerů **Degiro** 
 
 - Výnosy po letech v % (TWR, MWR/XIRR) i v Kč a jejich struktura: realizované a nerealizované zisky, dividendy, srážková daň, úroky a poplatky.
 - Portfolio a nákupní loty (FIFO), postup k časovému testu 3 roky.
-- Realizované obchody: zisk/ztráta, poplatky, doba držení.
+- Realizované obchody: zisk/ztráta, poplatky, doba držení a daňový status prodeje (časový test, limit 100 000 Kč, zdanitelné).
 - **Daňové přiznání – §10 (cenné papíry):** Příloha č. 2 (tabulka druh D, ř. 207–209 → ř. 40) připravená ke kopírování. Hlídá limit 100 000 Kč, časový test, oznámení osvobozených příjmů nad 5 mil. Kč (§38v) a nabízí volbu jednotný/denní kurz pro každý rok.
 - **Dividendy (§8):** sražená daň, zápočet v ČR a částka, kterou lze vymáhat zpět v zahraničí (podle smluv o zamezení dvojího zdanění, včetně postupu pro jednotlivé státy). Pro každý rok volba: samostatný základ §16a (Příloha č. 4, ř. 401a–414 → ř. 74a), nebo obecný základ (ř. 38 + Příloha č. 3 pro každý stát). Aplikace odhadne, která varianta je výhodnější.
 - Tipy k daňové optimalizaci: tax-loss harvesting, limit 100 000 Kč, blížící se časové testy, vratky sražené daně.
-- Zajímavosti: kolik zisku snědly ztráty, ušlý potenciál prodaných akcií, nejlepší a nejhorší obchody.
+- Zajímavosti za celý investiční horizont nebo za zvolený rok: kolik zisku snědly ztráty, ušlý potenciál prodaných akcií (absolutně i po zohlednění reinvestice výnosu z prodeje do portfolia), nejlepší a nejhorší obchody.
+- Všechny větší tabulky lze řadit podle sloupců, prohledávat a u vybraných sloupců filtrovat.
 
-Daňovou situaci (OSVČ, OSVČ v paušálním režimu, zaměstnanec, bez jiných příjmů) lze nastavit zvlášť pro každý rok.
+Daňovou situaci (OSVČ, OSVČ v paušálním režimu, zaměstnanec, bez jiných příjmů), jiný základ daně, zdanění dividend a přepočet měn lze nastavit zvlášť pro každý rok přímo v sekci **Daně**. Tabulka **Porovnání variant** ukazuje odhad daně pro každou kombinaci kurzu a zdanění dividend a označí nejvýhodnější.
 
 > ⚠️ Aplikace je pomůcka, ne daňové poradenství. Před podáním přiznání si výsledky ověřte.
 
@@ -54,7 +55,7 @@ Nový export stejného typu nahradí předchozí. Starý se přesune do `exports
 - **Výdaje** = pořizovací cena + poplatky při nákupu i prodeji (transakční poplatky, AutoFX, transakční daně). Ztráta z prodejů CP se uplatní jen proti ziskům z CP v témže roce.
 - **Dividendy**: zápočet je nejvýše min(sražená daň, sazba dle smlouvy, 15 % z hrubé dividendy); v obecném základu navíc omezen koeficientem z Přílohy č. 3. Přeplatek nad smluvní sazbu lze reklamovat u zahraničního správce daně. České dividendy a úroky XTB jsou zdaněny srážkou konečně.
 - **Povinnost podat přiznání**: OSVČ vždy; zaměstnanec při jiných příjmech nad 20 000 Kč; paušální režim při příjmech §8–§10 nad 50 000 Kč; bez jiných příjmů při zdanitelných příjmech nad 50 000 Kč.
-- **Výkonnost**: TWR z denního ocenění, MWR (XIRR). Tržní ceny z Yahoo Finance; když chybí, použije se poslední obchodní cena.
+- **Výkonnost**: TWR z denního ocenění, MWR (XIRR). Tržní ceny z Yahoo Finance; když chybí, použije se poslední obchodní cena (nebo ocenění brokera). Instrumenty bez tržních dat aplikace hlásí na Přehledu a v Nastavení (stav symbolu, filtr), odhadnuté ceny označuje „≈“.
 
 ## Vývoj
 

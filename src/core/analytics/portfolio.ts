@@ -51,6 +51,7 @@ export interface PositionView {
   price: number | null;
   priceCurrency: string | null;
   priceSource: string | null;
+  priceDate: string | null;
   realizedCzk: number;
   dividendsCzk: number;
 }
@@ -118,6 +119,7 @@ export function buildPositions(ledger: Ledger, lots: LotView[], realizations: Re
         price: null,
         priceCurrency: null,
         priceSource: null,
+        priceDate: null,
         realizedCzk: 0,
         dividendsCzk: dividendsByInstrument.get(id) ?? 0,
       };
@@ -140,6 +142,7 @@ export function buildPositions(ledger: Ledger, lots: LotView[], realizations: Re
     p.price = l.price;
     p.priceCurrency = l.priceCurrency;
     p.priceSource = l.priceSource;
+    p.priceDate = l.priceDate;
   }
   for (const r of realizations) get(r.instrumentId).realizedCzk += r.gainCzk;
   for (const id of dividendsByInstrument.keys()) get(id);

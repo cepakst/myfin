@@ -33,7 +33,15 @@ export interface FxMethodComparison {
   dailyDividendBaseCzk: number;
 }
 
-const fmt = (n: number) => `${Math.round(n).toLocaleString('cs-CZ')} Kč`;
+export interface DividendChoice {
+  year: number;
+  use16a: boolean;
+  foreignDividendsCzk: number;
+  estimatedTaxDividends16aCzk: number;
+  estimatedTaxDividendsGeneralCzk: number;
+}
+
+const fmt = (n: number) =>  `${Math.round(n).toLocaleString('cs-CZ')} Kč`;
 
 export function buildTips(opts: {
   year: number;
@@ -41,6 +49,8 @@ export function buildTips(opts: {
   report: SecuritiesYearReport;
   dividends: DividendPayment[];
   fxComparison: FxMethodComparison[];
+  /** Per-year dividend tax estimates for both §16a variants (years to advise on) */
+  dividendChoices?: DividendChoice[];
   taxRate?: number;
   today?: string;
 }): Tip[] {
@@ -183,8 +193,36 @@ export function buildTips(opts: {
       id: `fx-${c.year}`,
       severity: 'info',
       title: `Kurz pro rok ${c.year}: výhodnější je ${better}`,
-      text: `Základ daně (CP + zahraniční dividendy) vychází s jednotným kurzem ${fmt(c.unifiedBaseCzk + c.unifiedDividendBaseCzk)} a s denními kurzy ${fmt(c.dailyBaseCzk + c.dailyDividendBaseCzk)}. Metodu lze zvolit pro každý rok zvlášť (v rámci roku jednotně) v Nastavení. Pozor: výdaje se přepočítávají kurzem roku nákupu, výsledek je proto orientační.`,
+      text: `Základ daně (CP + zahraniční dividendy) vychází s jednotným kurzem ${fmt(c.unifiedBaseCzk + c.unifiedDividendBaseCzk)} a s denními kurzy ${fmt(c.dailyBaseCzk + c.dailyDividendBaseCzk)}. Metodu lze zvolit pro každý rok zvlášť (v rámci roku jednotně) v sekci Daně. Pozor: výdaje se přepočítávají kurzem roku nákupu, výsledek je proto orientační.`,
       amountCzk: Math.abs(diff) * rate,
+    });
+  }
+
+  // 8) Foreign dividends: separate §16a base vs. general base
+  for (const d of opts.dividendChoices ?? []) {
+    if (d.year < 2021 || d.foreignDividendsCzk <= 0) continue;
+    const t16a = d.estimatedTaxDividends16aCzk;
+    const tGen = d.estimatedTaxDividendsGeneralCzk;
+    const diff = Math.abs(t16a - tGen);
+    const variants = `Odhad daně ze zahraničních dividend (${fmt(d.foreignDividendsCzk)}): §16a (Příloha č. 4) ${fmt(t16a)}, obecný základ (ř. 38 + Příloha č. 3) ${fmt(tGen)}.`;
+    const where = 'Volbu i porovnání všech variant najdete v sekci Daně.';
+    if (diff < 200) {
+      tips.push({
+        id: `div16a-${d.year}`,
+        severity: 'info',
+        title: `Dividendy ${d.year}: obě varianty zdanění vycházejí podobně`,
+        text: `${variants} Rozdíl je zanedbatelný – §16a bývá jednodušší (samostatný základ, sazba 15 %). ${where}`,
+      });
+      continue;
+    }
+    const better16a = t16a < tGen;
+    const chosenBetter = d.use16a === better16a;
+    tips.push({
+      id: `div16a-${d.year}`,
+      severity: chosenBetter ? 'success' : 'warning',
+      title: `Dividendy ${d.year}: výhodnější je ${better16a ? 'samostatný základ §16a' : 'obecný základ'}${chosenBetter ? ' (zvoleno)' : ''}`,
+      text: `${variants} ${chosenBetter ? 'Aktuálně zvolená varianta je výhodnější.' : `Přepnutím ušetříte odhadem ${fmt(diff)}.`} ${better16a ? '§16a se vyplatí hlavně při vyšších ostatních příjmech (sazba 23 %) nebo když chcete dividendy oddělit od obecného základu.' : 'Obecný základ se vyplatí hlavně při nízkých ostatních příjmech, kdy daň pokryje sleva na poplatníka.'} ${where}`,
+      amountCzk: chosenBetter ? undefined : diff,
     });
   }
 

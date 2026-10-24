@@ -1,5 +1,5 @@
 import { ActionIcon, Card, CopyButton, Group, Paper, Select, Text, Tooltip, useComputedColorScheme } from '@mantine/core';
-import { IconCheck, IconCopy } from '@tabler/icons-react';
+import { IconCheck, IconCopy, IconInfoCircle } from '@tabler/icons-react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import type { ReactNode } from 'react';
@@ -33,12 +33,15 @@ function withDefaults(option: EChartsOption): EChartsOption {
   return o as EChartsOption;
 }
 
-export function Stat({ label, value, sub, color }: { label: string; value: ReactNode; sub?: ReactNode; color?: string }) {
+export function Stat({ label, value, sub, color, hint }: { label: string; value: ReactNode; sub?: ReactNode; color?: string; hint?: ReactNode }) {
   return (
     <Paper withBorder p="md" radius="md">
-      <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-        {label}
-      </Text>
+      <Group gap={4} wrap="nowrap">
+        <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+          {label}
+        </Text>
+        {hint && <Hint label={hint} />}
+      </Group>
       <Text fw={700} size="xl" c={color}>
         {value}
       </Text>
@@ -61,6 +64,32 @@ export function Section({ title, children, right }: { title: ReactNode; children
       {children}
     </Card>
   );
+}
+
+/** Small info icon with an explanatory tooltip */
+export function Hint({ label }: { label: ReactNode }) {
+  return (
+    <Tooltip label={label} multiline w={320} withArrow events={{ hover: true, focus: true, touch: true }}>
+      <IconInfoCircle size={14} style={{ opacity: 0.6, cursor: 'help', flexShrink: 0 }} tabIndex={0} aria-label="Nápověda" />
+    </Tooltip>
+  );
+}
+
+/** Wraps any element (e.g. a badge) with an explanatory tooltip */
+export function WithHint({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <Tooltip label={label} multiline w={340} withArrow events={{ hover: true, focus: true, touch: true }}>
+      <span style={{ cursor: 'help', display: 'inline-flex' }} tabIndex={0}>
+        {children}
+      </span>
+    </Tooltip>
+  );
+}
+
+/** The current calendar year when it is available, otherwise the latest year with data */
+export function defaultYear(s: { years: number[]; today: string }): number {
+  const cur = Number(s.today.slice(0, 4));
+  return s.years.includes(cur) ? cur : s.years.at(-1)!;
 }
 
 export function YearSelect({ years, value, onChange }: { years: number[]; value: number; onChange: (y: number) => void }) {

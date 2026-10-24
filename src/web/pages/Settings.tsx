@@ -1,13 +1,15 @@
-import { Accordion, Alert, Button, Group, List, NumberInput, Select, SimpleGrid, Stack, Table, Text, TextInput, Title } from '@mantine/core';
+import { Accordion, Alert, Anchor, Badge, Button, Group, List, NumberInput, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
 import { IconCloudDownload, IconDeviceFloppy, IconUpload } from '@tabler/icons-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { DataTable } from 'mantine-datatable';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, useSnapshot, type Settings } from '../api';
 import { Section } from '../components';
+import { DataGrid } from '../DataGrid';
 import { SITUATIONS } from '../format';
+import { MARKET_STATUS_COLOR, MARKET_STATUS_LABEL, MARKET_STATUS_ORDER, marketStatus, missingMarketData } from '../marketStatus';
 
 export function SettingsPage() {
   const qc = useQueryClient();
@@ -15,14 +17,12 @@ export function SettingsPage() {
   const snap = useSnapshot();
   const [st, setSt] = useState<Settings | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [instFilter, setInstFilter] = useState('');
   useEffect(() => {
     if (sq.data) setSt(structuredClone(sq.data.settings));
   }, [sq.data]);
   if (!st || !sq.data) return <Text>Načítám…</Text>;
 
   const s = snap.data;
-  const years = s?.years ?? [];
   const save = async () => {
     await api.saveSettings(st);
     notifications.show({ message: 'Uloženo – přepočítávám…', color: 'teal' });
@@ -34,9 +34,8 @@ export function SettingsPage() {
     f(c);
     setSt(c);
   };
-  const instruments = (s?.instruments ?? []).filter(
-    (i) => !instFilter || i.name.toLowerCase().includes(instFilter.toLowerCase()) || (instFilter === '!' && !i.hasMarket),
-  );
+  const instruments = s?.instruments ?? [];
+  const missing = missingMarketData(instruments);
 
   return (
     <Stack>
@@ -114,89 +113,12 @@ export function SettingsPage() {
             onChange={(v) => v && upd((x) => (x.defaultSituation = v as Settings['defaultSituation']))}
             maw={400}
           />
-          <Table withTableBorder fz="sm">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Rok</Table.Th>
-                <Table.Th>Situace</Table.Th>
-                <Table.Th>Jiný základ daně (Kč)</Table.Th>
-                <Table.Th>Zahraniční dividendy</Table.Th>
-                <Table.Th>Přepočet měn</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {years.map((y) => {
-                const p = st.taxProfiles[y];
-                return (
-                  <Table.Tr key={y}>
-                    <Table.Td fw={600}>{y}</Table.Td>
-                    <Table.Td>
-                      <Select
-                        size="xs"
-                        data={[{ value: '', label: '(výchozí)' }, ...SITUATIONS]}
-                        value={p?.situation ?? ''}
-                        onChange={(v) =>
-                          upd((x) => {
-                            if (!v) delete x.taxProfiles[y];
-                            else x.taxProfiles[y] = { ...(x.taxProfiles[y] ?? {}), situation: v as Settings['defaultSituation'] };
-                          })
-                        }
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      <NumberInput
-                        size="xs"
-                        thousandSeparator=" "
-                        placeholder="např. 600 000"
-                        value={p?.otherTaxBase ?? ''}
-                        onChange={(v) =>
-                          upd((x) => {
-                            x.taxProfiles[y] = { ...(x.taxProfiles[y] ?? {}), situation: x.taxProfiles[y]?.situation ?? x.defaultSituation, otherTaxBase: v === '' ? undefined : Number(v) };
-                          })
-                        }
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      {y < 2021 ? (
-                        <Text size="xs" c="dimmed">
-                          obecný základ (§16a až od 2021)
-                        </Text>
-                      ) : (
-                        <Select
-                          size="xs"
-                          data={[
-                            { value: '16a', label: '§16a – Příloha č. 4 (15 %)' },
-                            { value: 'general', label: 'Obecný základ + Příloha č. 3' },
-                          ]}
-                          value={p?.foreign16a === false ? 'general' : '16a'}
-                          onChange={(v) =>
-                            upd((x) => {
-                              x.taxProfiles[y] = { ...(x.taxProfiles[y] ?? {}), situation: x.taxProfiles[y]?.situation ?? x.defaultSituation, foreign16a: v !== 'general' };
-                            })
-                          }
-                        />
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      <Select
-                        size="xs"
-                        data={[
-                          { value: 'UNIFIED', label: 'Jednotný kurz' },
-                          { value: 'DAILY', label: 'Denní kurz ČNB' },
-                        ]}
-                        value={st.fx.methodByYear[y] ?? 'UNIFIED'}
-                        onChange={(v) => upd((x) => (x.fx.methodByYear[y] = (v ?? 'UNIFIED') as 'UNIFIED' | 'DAILY'))}
-                      />
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
-          <Text size="xs" c="dimmed">
-            „Jiný základ daně“ (např. ze zaměstnání nebo podnikání) slouží k odhadu sazby 15 / 23 % a koeficientu zápočtu v Příloze č. 3. Zdanění
-            zahraničních dividend podle §16a je volitelné – volba platí pro všechny zahraniční dividendy a úroky v daném roce; při nízkých příjmech
-            může být výhodnější obecný základ (uplatní se sleva na poplatníka).
+          <Text size="sm">
+            Daňovou situaci, jiný základ daně, způsob zdanění dividend a přepočet měn pro jednotlivé roky nastavíte na stránce{' '}
+            <Anchor component={Link} to="/dane">
+              Daně
+            </Anchor>
+            , kde uvidíte i porovnání variant.
           </Text>
           <Accordion variant="separated">
             <Accordion.Item value="rates">
@@ -236,23 +158,45 @@ export function SettingsPage() {
         </Stack>
       </Section>
 
-      <Section title="Instrumenty – tržní symboly a stát emitenta" right={<TextInput size="xs" placeholder="Filtr (! = bez tržních dat)" value={instFilter} onChange={(e) => setInstFilter(e.currentTarget.value)} />}>
+      <Section title="Instrumenty – tržní symboly a stát emitenta">
         <Alert color="blue" variant="light" mb="sm">
           Symbol Yahoo Finance se dohledává automaticky podle ISIN a ověřuje proti ceně obchodu. Pokud chybí nebo je špatně, zadejte jej ručně (např. „ELUX-B.ST“). Pomlčka „-“ = nepoužívat tržní data.
+          {missing.length > 0 && (
+            <Text size="sm" mt={4} c="orange" fw={500}>
+              Bez tržních dat: {missing.length} {missing.length === 1 ? 'instrument' : missing.length < 5 ? 'instrumenty' : 'instrumentů'} – jejich cena se odhaduje z posledního obchodu nebo ocenění brokera. V tabulce jsou nahoře.
+            </Text>
+          )}
         </Alert>
-        <DataTable
-          withTableBorder
-          striped
+        <DataGrid
+          label="Instrumenty"
           fz="xs"
           maxHeight={500}
           idAccessor="id"
           records={instruments}
+          defaultSort={{ column: 'hasMarket', direction: 'asc' }}
+          searchPlaceholder="Hledat název, ISIN, symbol…"
           columns={[
-            { accessor: 'name', title: 'Instrument', render: (i) => `${i.name} (${i.isin ?? i.id})` },
-            { accessor: 'symbol', title: 'Auto symbol', render: (i) => `${i.symbol ?? '–'} ${i.symbolNote ? `· ${i.symbolNote}` : ''}` },
+            { accessor: 'name', title: 'Instrument', searchValue: (i) => `${i.name} ${i.isin ?? ''} ${i.id}`, render: (i) => `${i.name} (${i.isin ?? i.id})` },
+            { accessor: 'symbol', title: 'Použitý symbol', render: (i) => `${i.symbol ?? '–'} ${i.symbolNote ? `· ${i.symbolNote}` : ''}` },
+            {
+              accessor: 'hasMarket',
+              title: 'Tržní data',
+              filterable: true,
+              filterValue: (i) => MARKET_STATUS_LABEL[marketStatus(i)],
+              sortValue: (i) => MARKET_STATUS_ORDER.indexOf(marketStatus(i)),
+              render: (i) => {
+                const m = marketStatus(i);
+                return (
+                  <Badge size="sm" variant="light" color={MARKET_STATUS_COLOR[m]}>
+                    {MARKET_STATUS_LABEL[m]}
+                  </Badge>
+                );
+              },
+            },
             {
               accessor: 'override',
               title: 'Ruční symbol',
+              sortable: false,
               render: (i) => (
                 <TextInput
                   size="xs"
@@ -271,6 +215,8 @@ export function SettingsPage() {
             {
               accessor: 'country',
               title: 'Stát (dividendy)',
+              // Sort by the saved value so a row does not move while its override is being typed
+              sortValue: (i) => sq.data?.settings.countryOverrides[i.id] ?? i.country,
               render: (i) => (
                 <TextInput
                   size="xs"

@@ -7,7 +7,7 @@ import { makePriceProvider, type PriceProvider, type SeriesLike } from '../core/
 import { runFifo, type Converter, type Realization } from '../core/fifo.js';
 import { FxRates, type CnbFixing } from '../core/fx.js';
 import { buildLedger } from '../core/parsers/index.js';
-import { profileFor, type Settings } from '../core/settings.js';
+import { profileFor, withYearProfile, type Settings } from '../core/settings.js';
 import { dapDividends, dapSecurities, type DapBlock } from '../core/tax/dap.js';
 import { buildDividendPayments, dividendYearReport, type DividendPayment, type DividendYearReport } from '../core/tax/dividends.js';
 import { highRateThreshold, securitiesYearReport, type SecuritiesYearReport } from '../core/tax/securities.js';
@@ -51,10 +51,25 @@ export interface Snapshot {
   taxSummaries: YearTaxSummary[];
   dap: { year: number; blocks: DapBlock[] }[];
   insights: Insights;
+  /** Insights restricted to a single calendar year */
+  insightsByYear: Record<number, Insights>;
   tips: Tip[];
   fxComparison: FxMethodComparison[];
+  /** Tax estimates for every combination of FX method and dividend taxation per year (with the year's situation) */
+  taxScenarios: Record<number, TaxScenario[]>;
   fxYears: FxYearInfo[];
   cnbLastDate: string;
+}
+
+export interface TaxScenario {
+  fxMethod: 'UNIFIED' | 'DAILY';
+  use16a: boolean;
+  securitiesBaseCzk: number;
+  foreignDividendsCzk: number;
+  estimatedTaxSecuritiesCzk: number;
+  estimatedTaxDividendsCzk: number;
+  estimatedTaxTotalCzk: number;
+  mustFile: boolean | null;
 }
 
 export interface EngineState {
@@ -107,19 +122,59 @@ function corporateCashRealizations(ledger: Ledger, conv: Converter): Realization
     });
 }
 
-function taxBases(ledger: Ledger, fx: FxRates, settings: Settings, years: number[]): { sec: Map<number, number>; div: Map<number, number> } {
-  const conv = convOf(fx, 'tax');
-  const fifo = runFifo(ledger, conv);
-  const rs = [...fifo.realizations, ...corporateCashRealizations(ledger, conv)];
-  const pays = buildDividendPayments(ledger, conv, conv, { countryOverrides: settings.countryOverrides, treatyOverrides: settings.treatyOverrides });
-  const sec = new Map<number, number>();
-  const div = new Map<number, number>();
-  for (const y of years) {
-    sec.set(y, securitiesYearReport(rs, y).taxable.resultCzk);
-    // dividend base after credit: foreign gross minus credit / rate equivalent -> use due tax / 15 %
-    div.set(y, dividendYearReport(pays, y).foreign.dueCzk / 0.15);
+/** Positive interest without final withholding (XTB withholds 15 % on free-funds interest – verified by INTEREST_TAX rows) */
+function otherCapitalByYear(ledger: Ledger, conv: Converter): Map<number, number> {
+  const m = new Map<number, number>();
+  for (const c of ledger.cash) {
+    if (c.kind === 'INTEREST' && c.amount > 0 && c.broker !== 'XTB') {
+      const y = Number(c.date.slice(0, 4));
+      m.set(y, (m.get(y) ?? 0) + conv(c.amount, c.currency, c.date));
+    }
   }
-  return { sec, div };
+  return m;
+}
+
+type FxMethod = 'UNIFIED' | 'DAILY';
+interface TaxVariant {
+  sec: SecuritiesYearReport;
+  div: DividendYearReport;
+  otherCapitalCzk: number;
+}
+
+/**
+ * Tax inputs of year `y` when that year used `method` and all other years keep their selected method
+ * (purchase costs of older lots are converted with the method chosen for the purchase year).
+ */
+function taxVariant(ledger: Ledger, fixings: CnbFixing[], settings: Settings, y: number, method: FxMethod): TaxVariant {
+  const conv = convOf(new FxRates(fixings, { ...settings.fx, methodByYear: { ...settings.fx.methodByYear, [y]: method } }), 'tax');
+  const rs = [...runFifo(ledger, conv).realizations, ...corporateCashRealizations(ledger, conv)];
+  const pays = buildDividendPayments(ledger, conv, conv, { countryOverrides: settings.countryOverrides, treatyOverrides: settings.treatyOverrides });
+  return { sec: securitiesYearReport(rs, y), div: dividendYearReport(pays, y), otherCapitalCzk: otherCapitalByYear(ledger, conv).get(y) ?? 0 };
+}
+
+/** Year summaries under both FX methods and both dividend options so the user can compare them */
+function taxScenarios(variants: Map<number, Record<FxMethod, TaxVariant>>, settings: Settings): Record<number, TaxScenario[]> {
+  const out: Record<number, TaxScenario[]> = {};
+  for (const [y, byMethod] of variants) {
+    out[y] = [];
+    for (const fxMethod of ['UNIFIED', 'DAILY'] as const) {
+      const { sec, div, otherCapitalCzk } = byMethod[fxMethod];
+      for (const use16a of y >= 2021 ? [true, false] : [false]) {
+        const sum = yearTaxSummary(withYearProfile(settings, y, { foreign16a: use16a }), sec, div, otherCapitalCzk);
+        out[y].push({
+          fxMethod,
+          use16a,
+          securitiesBaseCzk: sec.taxable.baseCzk,
+          foreignDividendsCzk: div.foreign.grossCzk,
+          estimatedTaxSecuritiesCzk: sum.estimatedTaxSecuritiesCzk,
+          estimatedTaxDividendsCzk: sum.estimatedTaxDividendsCzk,
+          estimatedTaxTotalCzk: sum.estimatedTaxTotalCzk,
+          mustFile: sum.mustFile,
+        });
+      }
+    }
+  }
+  return out;
 }
 
 export async function computeSnapshot(settings: Settings, opts: { refreshMarket?: boolean } = {}): Promise<void> {
@@ -151,8 +206,7 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
     for (const e of cnb.errors) ledger.warnings.push({ source: 'ČNB', message: e });
     const fixings: CnbFixing[] = cnb.fixings;
     const fx = new FxRates(fixings, settings.fx);
-    const fxDaily = new FxRates(fixings, { methodByYear: Object.fromEntries(years.map((y) => [y, 'DAILY' as const])), unifiedOverrides: settings.fx.unifiedOverrides });
-    const fxUnified = new FxRates(fixings, { methodByYear: Object.fromEntries(years.map((y) => [y, 'UNIFIED' as const])), unifiedOverrides: settings.fx.unifiedOverrides });
+
     const taxConv = convOf(fx, 'tax');
     const dailyConv = convOf(fx, 'daily');
 
@@ -194,27 +248,36 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
 
     const secReports = years.map((y) => securitiesYearReport(taxReal, y));
     const divReports = years.map((y) => dividendYearReport(dividends, y));
-    const otherCapital = new Map<number, number>();
-    for (const c of ledger.cash) {
-      // positive interest without final withholding (XTB withholds 15 % on free-funds interest – verified by INTEREST_TAX rows)
-      if (c.kind === 'INTEREST' && c.amount > 0 && c.broker !== 'XTB') {
-        const y = Number(c.date.slice(0, 4));
-        otherCapital.set(y, (otherCapital.get(y) ?? 0) + taxConv(c.amount, c.currency, c.date));
-      }
-    }
+    const otherCapital = otherCapitalByYear(ledger, taxConv);
     const taxSummaries = years.map((y, i) => yearTaxSummary(settings, secReports[i], divReports[i], otherCapital.get(y) ?? 0));
 
     log('Výkonnost portfolia');
     const performance = computePerformance(ledger, prices, dailyConv, econReal, today);
     const lots = buildLotViews(ledger, econFifo.openLots, taxFifo.openLots, prices, dailyConv, today);
     const positions = buildPositions(ledger, lots, econReal, divByInst);
-    const insights = computeInsights(ledger, econReal, dividends, prices, dailyConv, today);
+    const twrByDate = new Map(performance.daily.map((p) => [p.date, p.twr]));
+    const insightOpts = { twrAt: (d: string) => twrByDate.get(d) };
+    const insights = computeInsights(ledger, econReal, dividends, prices, dailyConv, today, insightOpts);
+    const insightsByYear = Object.fromEntries(years.map((y) => [y, computeInsights(ledger, econReal, dividends, prices, dailyConv, today, { ...insightOpts, year: y })]));
 
-    const db = taxBases(ledger, fxDaily, settings, years);
-    const ub = taxBases(ledger, fxUnified, settings, years);
+    log('Varianty zdanění');
+    // the selected method reuses the main computation; only the alternative needs an extra FIFO run per year
+    const variants = new Map<number, Record<FxMethod, TaxVariant>>();
+    years.forEach((y, i) => {
+      const selected: FxMethod = fx.methodFor(y);
+      const main: TaxVariant = { sec: secReports[i], div: divReports[i], otherCapitalCzk: otherCapital.get(y) ?? 0 };
+      const other: FxMethod = selected === 'UNIFIED' ? 'DAILY' : 'UNIFIED';
+      variants.set(y, { [selected]: main, [other]: taxVariant(ledger, fixings, settings, y, other) } as Record<FxMethod, TaxVariant>);
+    });
+    // dividend base after credit: due tax / 15 %
+    const fxBases = (v: TaxVariant) => ({ sec: Math.max(0, v.sec.taxable.resultCzk), div: v.div.foreign.dueCzk / 0.15 });
     const fxComparison: FxMethodComparison[] = years
       .filter((y) => y < lastYear || fx.unified('USD', y).provisional === false)
-      .map((y) => ({ year: y, unifiedBaseCzk: Math.max(0, ub.sec.get(y) ?? 0), dailyBaseCzk: Math.max(0, db.sec.get(y) ?? 0), unifiedDividendBaseCzk: ub.div.get(y) ?? 0, dailyDividendBaseCzk: db.div.get(y) ?? 0 }));
+      .map((y) => {
+        const u = fxBases(variants.get(y)!.UNIFIED);
+        const d = fxBases(variants.get(y)!.DAILY);
+        return { year: y, unifiedBaseCzk: u.sec, dailyBaseCzk: d.sec, unifiedDividendBaseCzk: u.div, dailyDividendBaseCzk: d.div };
+      });
 
     const curYearIdx = years.indexOf(lastYear);
     const tips = buildTips({
@@ -223,6 +286,7 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
       report: secReports[curYearIdx],
       dividends,
       fxComparison: fxComparison.filter((c) => c.year >= lastYear - 1),
+      dividendChoices: taxSummaries.filter((t) => t.year >= lastYear - 1),
       taxRate: (profileFor(settings, lastYear).otherTaxBase ?? 0) > highRateThreshold(lastYear) ? 0.23 : 0.15,
       today,
     });
@@ -266,8 +330,10 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
         ],
       })),
       insights,
+      insightsByYear,
       tips,
       fxComparison,
+      taxScenarios: taxScenarios(variants, settings),
       fxYears,
       cnbLastDate: fx.lastDate,
     };

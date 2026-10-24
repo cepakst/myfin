@@ -3,7 +3,8 @@ import type { FxConfig } from './fx.js';
 export type TaxSituation = 'EMPLOYEE' | 'OSVC' | 'OSVC_PAUSAL' | 'NO_INCOME';
 
 export interface YearTaxProfile {
-  situation: TaxSituation;
+  /** Missing = inherit defaultSituation */
+  situation?: TaxSituation;
   /** Other tax base (employment, business) in CZK – used for the 15 % / 23 % bracket estimate */
   otherTaxBase?: number;
   /** Tax foreign dividends in the separate §16a base (Příloha č. 4); default true from 2021 */
@@ -49,13 +50,28 @@ export function mergeSettings(raw: Partial<Settings> | undefined): Settings {
   };
 }
 
-export function profileFor(s: Settings, year: number): YearTaxProfile {
-  return s.taxProfiles[year] ?? { situation: s.defaultSituation };
+/** Effective profile of a year (situation resolved from the default when not set for the year) */
+export function profileFor(s: Settings, year: number): YearTaxProfile & { situation: TaxSituation } {
+  const p = s.taxProfiles[year] ?? {};
+  return { ...p, situation: p.situation ?? s.defaultSituation };
 }
 
 /** §16a separate tax base exists from 2021 and is elective */
 export function uses16a(s: Settings, year: number): boolean {
   return year >= 2021 && (profileFor(s, year).foreign16a ?? true);
+}
+
+/**
+ * Copy of the settings with the given year's stored tax profile patched. Only explicitly set fields are stored,
+ * so a year without its own situation keeps following `defaultSituation`; `undefined` values clear a field.
+ */
+export function withYearProfile(s: Settings, year: number, patch: Partial<YearTaxProfile>): Settings {
+  const merged: YearTaxProfile = { ...s.taxProfiles[year], ...patch };
+  const stored = Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== undefined)) as YearTaxProfile;
+  const taxProfiles = { ...s.taxProfiles };
+  if (Object.keys(stored).length) taxProfiles[year] = stored;
+  else delete taxProfiles[year];
+  return { ...s, taxProfiles };
 }
 
 export const SITUATION_LABELS: Record<TaxSituation, string> = {
