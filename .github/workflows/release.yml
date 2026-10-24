@@ -1,0 +1,112 @@
+# Builds a draft GitHub Release for a version tag created by `npm version <patch|minor|major>`.
+# Binaries are uploaded straight to the release (no Actions artifacts -> no Actions storage used).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Tag must match package.json version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::Tag $TAG does not match package.json version $VERSION. Use 'npm version <patch|minor|major>'."
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}  # only on gh steps, so npm install scripts never see a write token
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists – assets will be replaced."
+          else
+            PRERELEASE=""
+            case "$TAG" in *-*) PRERELEASE="--prerelease" ;; esac
+            gh release create "$TAG" --draft $PRERELEASE --verify-tag --generate-notes --title "Myfin ${TAG#v}"
+          fi
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            app: dist-electron/win-unpacked/Myfin.exe
+            assets: dist-electron/*.exe
+          - os: macos-latest
+            script: dist:mac
+            app: dist-electron/mac-arm64/Myfin.app/Contents/MacOS/Myfin
+            assets: dist-electron/*.dmg dist-electron/*.zip
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}
+        env:
+          # No paid certificates: Windows build is unsigned, macOS uses ad-hoc signing (mac.identity "-").
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify macOS signatures
+        if: runner.os == 'macOS'
+        run: |
+          for app in dist-electron/mac*/Myfin.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
+      - name: Smoke test the packaged app
+        run: npm run smoke:app -- "${{ matrix.app }}"
+      - name: List built files
+        shell: bash
+        run: ls -la dist-electron
+      - name: Upload to the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" ${{ matrix.assets }} --clobber
+
+  checksums:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Add SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir assets && cd assets
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'Myfin*'
+          sha256sum Myfin* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release upload "$TAG" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber

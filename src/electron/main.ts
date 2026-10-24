@@ -2,7 +2,8 @@ import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DEFAULT_PORT = 5174;
+// MYFIN_PORT is used by the packaged-app smoke test (scripts/smoke-app.mjs).
+const DEFAULT_PORT = Number(process.env.MYFIN_PORT) || 5174;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 

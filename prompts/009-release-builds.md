@@ -1,0 +1,1 @@
+Sestav plan na verzovani aplikace a build releasu v github akcich. Chci mit k dispozici instalacky pro Windows a Mac a i spustitelne portable verze. Verzovani by melo byt co nejjednodussi pomoci npm version a version tagu a zacneme verzi 1.0.0.

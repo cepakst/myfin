@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { selectYear, waitForSnapshot } from './helpers.js';
+
+const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
 
 const PAGES = [
   { label: 'Přehled', hash: '#/' },
@@ -48,6 +51,7 @@ test.describe('app smoke', () => {
     const brand = page.locator('header').getByTestId('brand');
     await expect(brand).toContainText('Myfin');
     await expect(brand).toContainText('Moje finance přehledně');
+    await expect(brand).toHaveAttribute('title', `Myfin ${version}`);
     expect(await brand.locator('img').evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
     expect((await page.locator('header').boundingBox())!.height).toBeLessThanOrEqual(57);
     await brand.click();

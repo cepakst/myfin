@@ -43,13 +43,39 @@ Pokud macOS při prvním dvojkliku na `start.command` hlásí, že jej nelze ote
 
 ```bash
 npm run electron     # sestaví a spustí v okně aplikace
-npm run dist:win     # Windows: instalátor dist-electron\Myfin Setup 1.0.0.exe
-npm run dist:mac     # macOS: dist-electron/Myfin-1.0.0-mac-arm64.dmg a -x64.dmg (+ .zip)
+npm run dist:win     # Windows: dist-electron\Myfin-Setup-1.0.0-win-x64.exe (instalátor) a Myfin-1.0.0-win-x64-portable.exe
+npm run dist:mac     # macOS: dist-electron/Myfin-1.0.0-mac-arm64.dmg a -x64.dmg (+ portable .zip)
 ```
 
-Instalátor pro macOS lze sestavit jen na Macu. Aplikace není podepsaná, proto ji při prvním spuštění otevřete pravým tlačítkem → **Otevřít** (případně povolte v *Nastavení systému → Soukromí a zabezpečení*).
+Instalátor pro macOS lze sestavit jen na Macu. Aplikace není podepsaná certifikátem, proto ji při prvním spuštění otevřete pravým tlačítkem → **Otevřít** (případně povolte v *Nastavení systému → Soukromí a zabezpečení*).
 
-Nainstalovaná aplikace ukládá exporty, nastavení a cache do `%APPDATA%\myfin` (Windows) nebo `~/Library/Application Support/myfin` (macOS), vždy v podsložkách `exports` a `data`.
+Nainstalovaná i portable aplikace ukládá exporty, nastavení a cache do `%APPDATA%\myfin` (Windows) nebo `~/Library/Application Support/myfin` (macOS), vždy v podsložkách `exports` a `data`. Obě varianty tedy sdílejí stejná data a nelze je spustit současně.
+
+### Vydání (release)
+
+Hotové aplikace se stahují z [Releases](https://github.com/cepakst/myfin/releases):
+
+| Soubor | Co to je |
+| ------ | -------- |
+| `Myfin-Setup-X.Y.Z-win-x64.exe` | Windows – instalátor (zástupce v nabídce Start, odinstalace přes Nastavení) |
+| `Myfin-X.Y.Z-win-x64-portable.exe` | Windows – spustitelná aplikace bez instalace (první start trvá déle, rozbaluje se) |
+| `Myfin-X.Y.Z-mac-arm64.dmg` / `-x64.dmg` | macOS (Apple Silicon / Intel) – otevřít a přetáhnout do Aplikací |
+| `Myfin-X.Y.Z-mac-arm64-portable.zip` / `-x64-portable.zip` | macOS – zabalená aplikace, stačí rozbalit a spustit |
+| `SHA256SUMS.txt` | kontrolní součty souborů |
+
+Aplikace nejsou podepsané placeným certifikátem:
+
+- **Windows:** SmartScreen může hlásit „Systém Windows ochránil váš počítač“ → **Další informace** → **Přesto spustit**.
+- **macOS:** první spuštění pravým tlačítkem → **Otevřít**. Pokud systém hlásí, že je aplikace poškozená, spusťte `xattr -cr /Applications/Myfin.app` (u portable verze cestu k rozbalené aplikaci).
+
+Nové vydání (verzování podle [SemVer](https://semver.org/lang/cs/)):
+
+```bash
+npm version patch    # opravy (1.0.0 → 1.0.1); minor = nové funkce (1.1.0), major = nekompatibilní změny (2.0.0)
+git push --follow-tags
+```
+
+`npm version` spustí typecheck a testy, zvýší verzi v `package.json`, vytvoří commit „Release vX.Y.Z“ a tag `vX.Y.Z`. Po odeslání tagu GitHub Actions otestuje a sestaví verze pro Windows a macOS a připraví je jako **koncept (draft) release**. Ten po kontrole zveřejníte tlačítkem *Publish release*. Aktuální verze aplikace se zobrazí po najetí myší na logo.
 
 ### Exporty
 

@@ -17,8 +17,10 @@
     "build:electron": "esbuild src/electron/main.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/electron/main.js",
     "start": "node dist/server/main.js",
     "electron": "npm run build && npm run build:electron && electron .",
-    "dist:win": "npm run build && npm run build:electron && electron-builder --win nsis",
-    "dist:mac": "npm run build && npm run build:electron && electron-builder --mac dmg zip --arm64 --x64",
+    "dist:win": "npm run build && npm run build:electron && electron-builder --win --x64 --publish never",
+    "dist:mac": "npm run build && npm run build:electron && electron-builder --mac --arm64 --x64 --publish never",
+    "preversion": "npm run typecheck && npm test",
+    "smoke:app": "node scripts/smoke-app.mjs",
     "icons": "tsx scripts/generate-icons.ts",
     "demo:generate": "tsx scripts/generate-demo.ts",
     "typecheck": "tsc --noEmit",
@@ -38,8 +40,12 @@
       "demo/**",
       "package.json"
     ],
+    "publish": null,
     "win": {
-      "target": "nsis"
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "mac": {
       "target": [
@@ -47,13 +53,19 @@
         "zip"
       ],
       "category": "public.app-category.finance",
-      "identity": null,
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+      "identity": "-",
+      "hardenedRuntime": false,
+      "artifactName": "${productName}-${version}-mac-${arch}-portable.${ext}"
     },
     "dmg": {
-      "title": "${productName} ${version}"
+      "title": "${productName} ${version}",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-win-${arch}-portable.${ext}"
     },
     "nsis": {
+      "artifactName": "${productName}-Setup-${version}-win-${arch}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
