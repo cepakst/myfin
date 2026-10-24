@@ -2,6 +2,8 @@
 
 Lokální aplikace pro přehled investic a daní z exportů brokerů **Degiro** a **XTB**.
 
+![Přehled aplikace Myfin s ukázkovými daty](docs/screenshot.png)
+
 - Výnosy po letech v % (TWR, MWR/XIRR) i v Kč a jejich struktura: realizované a nerealizované zisky, dividendy, srážková daň, úroky a poplatky.
 - Portfolio a nákupní loty (FIFO), postup k časovému testu 3 roky.
 - Realizované obchody: zisk/ztráta, poplatky, doba držení a daňový status prodeje (časový test, limit 100 000 Kč, zdanitelné).
@@ -99,3 +101,11 @@ Struktura:
 - `src/server` – Fastify API, cache ČNB a Yahoo, orchestrace
 - `src/web` – React + Mantine + ECharts
 - `tests` – testy pouze se smyšlenými daty
+
+## Licence
+
+Copyright © 2026 cepakst
+
+Aplikace je svobodný software pod licencí [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-or-later), verze 3 nebo (podle vaší volby) kterékoli pozdější verze. Můžete ji používat, upravovat a šířit. Pokud ale šíříte upravenou verzi nebo ji zpřístupníte jiným uživatelům přes síť (např. jako webovou službu), musíte jim poskytnout její zdrojový kód pod stejnou licencí.
+
+Aplikace se poskytuje bez jakékoli záruky. Není daňovým poradenstvím.

@@ -6,6 +6,7 @@
   "type": "module",
   "main": "dist/electron/main.js",
   "author": "cepakst",
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "tsx watch src/server/main.ts",
