@@ -6,7 +6,6 @@ on:
     branches: ['**']
     paths-ignore:
       - '**.md'
-      - 'prompts/**'
       - 'LICENSE'
 
 permissions:
