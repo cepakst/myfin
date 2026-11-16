@@ -1,0 +1,13 @@
+﻿"Výpis č. 3/2026 z účtu ""2101234567/2010"""
+"Majitel účtu: Novák Jan, Ukázková 1, Praha"
+"Vytvořeno v aplikaci Internetbanking 2.0: 31.03.2026 08:00:00"
+"Období: 01.03.2026 - 31.03.2026"
+"Počáteční stav účtu k 01.03.2026: 219472,53 CZK"
+"Koncový stav účtu k 31.03.2026: 224979,45 CZK"
+"Suma příjmů: 5596,38 CZK"
+"Suma výdajů: -89,46 CZK"
+
+"ID operace";"Datum";"Objem";"Měna";"Protiúčet";"Název protiúčtu";"Kód banky";"Název banky";"KS";"VS";"SS";"Poznámka";"Zpráva pro příjemce";"Typ";"Provedl";"Upřesnění";"Poznámka";"BIC";"ID pokynu"
+"10020248883";"16.03.2026";"5000,00";"CZK";"19-2000145398";"NOVAK JAN";"0100";"Komerční banka, a.s.";"";"";"";"Spoření";"Spoření";"Bezhotovostní příjem";"";"";"";"";"10022680016"
+"10020256802";"31.03.2026";"596,38";"CZK";"";"";"";"";"";"";"";"";"";"Připsaný úrok";"";"";"";"";""
+"10020264721";"31.03.2026";"-89,46";"CZK";"";"";"";"";"";"";"";"";"";"Odvod daně z úroků";"";"";"";"";""

@@ -399,7 +399,8 @@ async function main() {
   xRows.sort((a, b) => a.time.getTime() - b.time.getTime());
 
   // ---------- write ----------
-  rmSync(OUT, { recursive: true, force: true });
+  // only the investment exports: demo/fio|kb|rb come from scripts/generate-demo-banks.ts
+  for (const d of ['degiro', 'xtb']) rmSync(join(OUT, d), { recursive: true, force: true });
   mkdirSync(join(OUT, 'degiro'), { recursive: true });
   mkdirSync(join(OUT, 'xtb'), { recursive: true });
 

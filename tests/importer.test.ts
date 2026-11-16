@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readXtbTables } from '../src/core/exportTables.js';
+import { buildBankLedger } from '../src/core/accounts/ledger.js';
 import { buildLedger } from '../src/core/parsers/index.js';
 import type { Ledger } from '../src/core/types.js';
 import {
@@ -20,6 +21,7 @@ import {
   replanImport,
 } from '../src/server/importer.js';
 import { classifyExportFiles, listExportFiles, relExportPath } from '../src/server/store.js';
+import { fioCsv, kbCsv, rbCsv, type BankRow } from './bankFixtures.js';
 
 // ---------- synthetic Degiro data ----------
 
@@ -932,5 +934,196 @@ describe('review fixes', () => {
     const long = await previewUpload(store, 'Transactions.csv', Buffer.from(txText([{ d: '2022-06-08', qty: 1, price: 1, order: 'o-l' }])));
     expect(long.units[0].warnings.some((w) => w.includes('chybí období'))).toBe(true);
     await cancelImport(long.id);
+  });
+});
+
+// ---------- bank statements (accounts module) ----------
+
+describe('bank statements', () => {
+  const FIO_ACC = '2101234567';
+  const unitFio = `banks/fio/${FIO_ACC}`;
+  const row = (id: string, date: string, amount: number, extra: Partial<BankRow> = {}): BankRow => ({ id, date, amount, type: 'Bezhotovostní příjem', ...extra });
+  const sum = (rows: BankRow[]) => rows.reduce((s, r) => s + r.amount, 0);
+
+  const DEC = [row('D1', '2024-12-10', 1000)];
+  const JAN = [row('J1', '2025-01-05', 500), row('J2', '2025-01-20', -200, { type: 'Platba kartou' })];
+  const FEB = [row('F1', '2025-02-05', 500)];
+  const stmt = (from: string, to: string, open: number, rows: BankRow[], n = 1) => fioCsv({ account: FIO_ACC, n, from, to, open, close: open + sum(rows), rows });
+  const sDec = () => stmt('2024-12-01', '2024-12-31', 0, DEC);
+  const sJan = (rows = JAN) => stmt('2025-01-01', '2025-01-31', 1000, rows);
+  const sFeb = () => stmt('2025-02-01', '2025-02-28', 1300, FEB);
+
+  const bankLedgerOf = (root = store) =>
+    buildBankLedger(classifyExportFiles(root).files.map((p) => ({ name: relExportPath(root, p), data: new Uint8Array(readFileSync(p)) })));
+  const bankArchive = () => archiveFiles().filter((f) => f.includes('banks/'));
+
+  it('monthly Fio statements imported one by one are split by year, contiguous and without gap warnings', async () => {
+    for (const [name, text] of [['dec.csv', sDec()], ['jan.csv', sJan()], ['feb.csv', sFeb()]] as const) {
+      const p = await previewUpload(store, name, Buffer.from(text));
+      expect(p.conflict).toBe(false);
+      expect(p.units[0].plan.newGaps).toEqual([]);
+      expect(p.units[0].warnings.some((w) => w.includes('chybí období'))).toBe(false);
+      expect(p.units[0].rangeEditable).toBe(false);
+      await commitImport(p.id, 'merge', undefined, store);
+    }
+    expect(storedFiles()).toEqual([`${unitFio}/2024/transactions.csv`, `${unitFio}/2025/transactions.csv`, `${unitFio}/balances.csv`]);
+    const info = await coverageOf(unitFio);
+    expect(info!.coverage).toEqual([{ from: '2024-12-01', to: '2025-02-28' }]);
+    expect(info!.years).toEqual([
+      { year: 2024, rows: 1 },
+      { year: 2025, rows: 3 },
+    ]);
+    expect(info!.label).toContain(FIO_ACC);
+    // statement balances: the opening of a month equals the closing of the previous one (one point per day)
+    const bal = read(`${unitFio}/balances.csv`).trim().split('\n');
+    expect(bal[0]).toBe(`#myfin-bank,1,FIO,${FIO_ACC},CZK`);
+    expect(bal.slice(2)).toEqual(['2024-11-30,0', '2024-12-31,1000', '2025-01-31,1300', '2025-02-28,1800']);
+    const l = bankLedgerOf();
+    expect(l.warnings).toEqual([]);
+    expect(l.txs).toHaveLength(4);
+    expect(l.txs.map((t) => t.amount)).toEqual([1000, 500, -200, 500]);
+    // the year file only gained rows: it is replaced in place, not archived (bank kinds only)
+    expect(bankArchive()).toEqual([]);
+  });
+
+  it('a missing month between statements is reported as a gap', async () => {
+    await seed({ 'dec.csv': sDec() });
+    const p = await previewUpload(store, 'feb.csv', Buffer.from(sFeb()));
+    expect(p.units[0].plan.newGaps).toEqual([{ from: '2025-01-01', to: '2025-01-31' }]);
+    expect(p.units[0].warnings.some((w) => w.includes('chybí období'))).toBe(true);
+    await cancelImport(p.id);
+  });
+
+  it('re-importing the same statement is unchanged and writes nothing', async () => {
+    await seed({ 'jan.csv': sJan() });
+    const stable = () => storeState().filter((l) => !l.startsWith('_archiv') && !l.startsWith(COVERAGE_FILE));
+    const before = stable();
+    const p = await previewUpload(store, 'jan.csv', Buffer.from(sJan()));
+    expect(p.units[0].plan).toMatchObject({ added: 0, removed: 0, unchanged: true });
+    const r = await commitImport(p.id, 'merge', undefined, store);
+    expect(r.written).toEqual([]);
+    expect(r.archived).toEqual([]);
+    expect(stable()).toEqual(before);
+  });
+
+  it('a later export of the same period with an extra row only adds it (no archive copy); a changed row is a conflict and the replaced year file is archived', async () => {
+    await seed({ 'jan.csv': sJan() });
+    const extra = row('J3', '2025-01-25', 50);
+    const more = await upload('jan2.csv', sJan([...JAN, extra]));
+    expect(more.preview.conflict).toBe(false);
+    expect(more.preview.units[0].plan).toMatchObject({ added: 1, removed: 0 });
+    expect(more.result.written).toContain(`${unitFio}/2025/transactions.csv`);
+    // the statement states a different closing balance for the same day (the extra row), so only balances.csv is archived
+    expect(bankArchive().filter((f) => f.endsWith('transactions.csv'))).toEqual([]);
+    expect(more.result.archived).toEqual([`${unitFio}/balances.csv`]);
+    expect(bankLedgerOf().txs).toHaveLength(3);
+
+    const changed = [...JAN, { ...extra, amount: 60 }];
+    const p = await previewUpload(store, 'jan3.csv', Buffer.from(sJan(changed)));
+    expect(p.conflict).toBe(true);
+    expect(p.units[0].plan).toMatchObject({ added: 1, removed: 1 });
+    const r = await commitImport(p.id, 'merge', undefined, store);
+    expect(r.archived).toContain(`${unitFio}/2025/transactions.csv`);
+    expect(bankArchive().some((f) => f.endsWith(`${unitFio}/2025/transactions.csv`))).toBe(true);
+    expect(bankLedgerOf().txs.map((t) => t.amount).sort((a, b) => a - b)).toEqual([-200, 60, 500]);
+  });
+
+  it('a changed row in the inbox becomes pending and changes nothing', async () => {
+    put('fio/jan.csv', sJan());
+    await scan();
+    const state = storeState();
+    put('fio/jan-corrected.csv', sJan([JAN[0], { ...JAN[1], amount: -250 }]));
+    const r = await scan();
+    expect(statusOf(r, 'fio/jan-corrected.csv')).toBe('pending');
+    expect(r.messages.some((m) => m.includes('jan-corrected.csv') && m.includes('čeká na rozhodnutí'))).toBe(true);
+    expect(storeState()).toEqual(state);
+  });
+
+  it('an overlapping KB yearly export merges without duplicates (cp1250 diacritics survive)', async () => {
+    const kbRows = (list: Omit<BankRow, 'type'>[]): BankRow[] => list.map((r) => ({ type: 'Odchozí úhrada', ...r }));
+    const feb = kbRows([
+      { id: 'K1', date: '2025-02-03', amount: 1000, cpName: 'ČEZ Prodej', message: 'Příliš žluťoučký kůň' },
+      { id: 'K2', date: '2025-02-10', amount: -100 },
+    ]);
+    const jan = kbRows([{ id: 'K0', date: '2025-01-15', amount: -50 }]);
+    await seed({ 'kb-feb.csv': kbCsv({ account: '19-2000145398', from: '2025-02-01', to: '2025-02-28', open: 500, close: 1400, rows: feb }) });
+    const year = kbCsv({ account: '19-2000145398', from: '2025-01-01', to: '2025-12-31', open: 550, close: 1400, rows: [...jan, ...feb] });
+    const p = await previewUpload(store, 'kb-year.csv', year);
+    expect(p.conflict).toBe(false);
+    expect(p.units[0].plan).toMatchObject({ added: 1, removed: 0 });
+    expect(p.units[0].rangeEditable).toBe(false);
+    await commitImport(p.id, 'merge', undefined, store);
+    expect(storedFiles()).toEqual(['banks/kb/19-2000145398/2025/transactions.csv', 'banks/kb/19-2000145398/balances.csv']);
+    const l = bankLedgerOf();
+    expect(l.txs).toHaveLength(3);
+    expect(l.txs.find((t) => t.bankTxId === 'K1')!.message).toBe('Příliš žluťoučký kůň');
+    expect(l.txs.find((t) => t.bankTxId === 'K1')!.cpName).toBe('ČEZ Prodej');
+    expect((await coverageOf('banks/kb/19-2000145398'))!.coverage).toEqual([{ from: '2025-01-01', to: '2025-12-31' }]);
+    // the stored file is UTF-8
+    expect(read('banks/kb/19-2000145398/2025/transactions.csv')).toContain('Příliš žluťoučký kůň');
+  });
+
+  it('Raiffeisenbank: the period is editable, a two-account file yields two units', async () => {
+    const other: BankRow[] = [row('S1', '2025-03-31', 1000, { type: 'Inteligentní spoření - převod prostředků na spořicí účet' })];
+    const text = rbCsv({ account: '1234567890', name: 'eKonto SMART', rows: [row('R1', '2025-03-02', -349, { type: 'Platba kartou', merchant: 'WOLT' })], other: { account: '1234567891', name: 'Spořicí účet', rows: other } });
+    const p = await previewUpload(store, 'rb.csv', Buffer.from(text));
+    expect(p.units).toHaveLength(2);
+    for (const u of p.units) expect(u.rangeEditable).toBe(true);
+    await commitImport(p.id, 'merge', undefined, store);
+    expect(storedFiles()).toEqual(['banks/rb/1234567890/2025/transactions.csv', 'banks/rb/1234567891/2025/transactions.csv']);
+    // RB exports carry no balance: no balances file
+    expect(storedFiles().some((f) => f.endsWith('balances.csv'))).toBe(false);
+    const l = bankLedgerOf();
+    expect([...l.accounts.keys()].sort()).toEqual(['1234567890/5500', '1234567891/5500']);
+    expect(l.accounts.get('1234567891/5500')!.name).toBe('Spořicí účet');
+  });
+
+  it('the exports folder (fio, kb, rb subfolders) is imported automatically and stays untouched', async () => {
+    put('fio/Vypis_z_uctu-2101234567_20250101-20250131_cislo-1.csv', sJan());
+    put('kb/Vypis_1.csv', kbCsv({ account: '19-2000145398', from: '2025-02-01', to: '2025-02-28', open: 0, close: 10, rows: [{ id: 'K1', date: '2025-02-03', amount: 10, type: 'Příchozí úhrada' }] }));
+    put('rb/Pohyby_1234567890.csv', rbCsv({ account: '1234567890', name: 'eKonto', rows: [row('R1', '2025-03-02', -5, { type: 'Platba kartou' })] }));
+    const r = await scan();
+    expect(r.storage.inbox.map((f) => `${f.path}:${f.status}`)).toEqual([
+      'fio/Vypis_z_uctu-2101234567_20250101-20250131_cislo-1.csv:imported',
+      'kb/Vypis_1.csv:imported',
+      'rb/Pohyby_1234567890.csv:imported',
+    ]);
+    expect(r.messages.filter((m) => m.startsWith('Importován soubor'))).toHaveLength(3);
+    expect(bankLedgerOf().txs).toHaveLength(4);
+    // the second scan is a no-op
+    const state = storeState();
+    expect((await scan()).messages).toEqual([]);
+    expect(storeState()).toEqual(state);
+  });
+
+  it('a Fio statement without movements (balance only) still creates the account and its balances', async () => {
+    await seed({ 'empty.csv': fioCsv({ account: '2109999999', from: '2025-01-01', to: '2025-01-31', open: 250, close: 250, rows: [] }) });
+    expect(storedFiles()).toEqual(['banks/fio/2109999999/balances.csv']);
+    const u = (await coverageOf('banks/fio/2109999999'))!;
+    expect(u.label).toContain('2109999999');
+    expect(u.years).toEqual([]);
+    const l = bankLedgerOf();
+    expect(l.txs).toEqual([]);
+    expect(l.accounts.get('2109999999/2010')!.balancePoints).toEqual([
+      { date: '2024-12-31', balance: 250 },
+      { date: '2025-01-31', balance: 250 },
+    ]);
+  });
+
+  it('bank files never reach the investment ledger and coexist with Degiro data', async () => {
+    await seed({ 'Transactions.csv': txText(TX), 'jan.csv': sJan() });
+    const l = await ledgerOf();
+    expect(l.warnings).toEqual([]);
+    expect(l.trades).toHaveLength(9);
+    expect(storedFiles().filter((f) => f.startsWith('banks/'))).toHaveLength(2);
+    const units = (await loadExportsForSnapshot(store, inbox, NO_SETTLE)).storage.units.map((u) => u.unit);
+    expect(units).toContain('degiro/tx');
+    expect(units).toContain(unitFio);
+  });
+
+  it('an unreadable bank file is rejected on upload with a clear error', async () => {
+    const bad = '"Výpis č. 1/2025 z účtu ""x/2010"""\n"ID operace";"Datum";"Objem";"Měna"\n';
+    await expect(previewUpload(store, 'bad.csv', Buffer.from(bad))).rejects.toBeInstanceOf(ImportError);
+    expect(storedFiles()).toEqual([]);
   });
 });

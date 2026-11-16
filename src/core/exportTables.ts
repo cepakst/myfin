@@ -10,10 +10,13 @@ import { isIsoDate } from './exportStore.js';
 import { cellDate, cellText, headerIndex, loadXtbWorkbook, sheetRows } from './parsers/xtb.js';
 import { dmyToIso, isoDateUtc, pad2 } from './util.js';
 
-export type TableKind = 'DEGIRO_TX' | 'DEGIRO_ACCOUNT' | 'XTB';
+export type TableKind = 'DEGIRO_TX' | 'DEGIRO_ACCOUNT' | 'XTB' | BankTableKind;
+
+/** Bank statements (accounts module), see accounts/bankTables.ts */
+export type BankTableKind = 'BANK_FIO' | 'BANK_KB' | 'BANK_RB';
 
 export interface ExportTable {
-  /** storage unit: 'degiro/tx', 'degiro/account' or 'xtb/<account>' */
+  /** storage unit: 'degiro/tx', 'degiro/account', 'xtb/<account>' or 'banks/<bank>/<account>' */
   unit: string;
   kind: TableKind;
   label: string;
@@ -26,12 +29,14 @@ export interface ExportTable {
   declaredRange?: DateRange;
   /** XTB "Open Positions" sheet (a snapshot on the report date) */
   openPositions?: { asOf: string; rows: unknown[][] };
+  /** account balances stated in a bank statement (end of day) */
+  balances?: { date: string; balance: number }[];
   warnings: string[];
 }
 
 export const DEGIRO_FILE: Record<'DEGIRO_TX' | 'DEGIRO_ACCOUNT', string> = { DEGIRO_TX: 'Transactions.csv', DEGIRO_ACCOUNT: 'Account.csv' };
 
-const FIELD_SEP = '\u001f';
+export const FIELD_SEP = '\u001f';
 const ROW_SEP = '\u001e';
 
 /** Account ids become folder names: keep them portable and outside the skipped "_" folders. */
@@ -141,7 +146,7 @@ function storedCell(v: unknown): unknown {
   return v ?? null;
 }
 
-function normCell(v: unknown): string {
+export function normCell(v: unknown): string {
   const s = storedCell(v);
   return s === null || s === undefined ? '' : String(s).trim();
 }

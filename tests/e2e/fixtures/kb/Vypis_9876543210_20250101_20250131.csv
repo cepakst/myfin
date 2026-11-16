@@ -1,0 +1,24 @@
+KB+, vypis v csv. formatu;;;;;;;;;;;;;;;;;;
+Datum vytvoreni souboru;31.01.2025;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+Cislo uctu;9876543210;;;;;;;;;;;;;;;;;
+Mena uctu / Hlavni mena uctu;CZK;;;;;;;;;;;;;;;;;
+Mena vypisu;;;;;;;;;;;;;;;;;;
+IBAN;CZ0000000000000000000000;;;;;;;;;;;;;;;;;
+Nazev uctu;TEST OWNER;;;;;;;;;;;;;;;;;
+Vypis od;01.01.2025;;;;;;;;;;;;;;;;;
+Vypis do;31.01.2025;;;;;;;;;;;;;;;;;
+Cislo vypisu;;;;;;;;;;;;;;;;;;
+Pocet polozek;7;;;;;;;;;;;;;;;;;
+Mena;CZK;EUR;USD;GBP;;;;;;;;;;;;;;
+Pocatecni zustatek;20000,00;;;;;;;;;;;;;;;;;
+Konecny zustatek;38201,00;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+Datum zauctovani;Datum provedeni;Protistrana;Nazev protiuctu;Castka;Mena;Originalni castka;Originalni mena;Smenny kurz;VS;KS;SS;Identifikace transakce;Typ transakce;Popis pro me;Zprava pro prijemce;Reference platby;BIC / SWIFT;Poplatek
+05.01.2025;05.01.2025;2700112233/2010;ACME TEST S.R.O.;50000,00;CZK;;;;202501;0;0;KBT0000000001;Pøíchozí úhrada;;MZDA;;;
+10.01.2025;10.01.2025;107-9988776655/0100;BYTOVE DRUZSTVO TEST;-15000,00;CZK;;;;1203;0;0;KBT0000000002;Trvalý pøíkaz;;Nájem;;;
+13.01.2025;13.01.2025;2101112223/2010;JAN TESTOVAC;-5000,00;CZK;;;;0;0;0;KBT0000000003;Trvalý pøíkaz;;Spoøení;;;
+13.01.2025;13.01.2025;1112223335/5500;JAN TESTOVAC;-8000,00;CZK;;;;0;0;0;KBT0000000004;Trvalý pøíkaz;;Kapesné na kartu;;;
+15.01.2025;15.01.2025;2501234567/2010;XTB S.A., organizaèní složka;-3000,00;CZK;;;;0;0;0;KBT0000000005;Odchozí úhrada;;Vklad XTB;;;
+20.01.2025;20.01.2025;5555555/0800;ZKUSEBNI SPOLECNOST S.R.O.;-700,00;CZK;;;;0;0;0;KBT0000000007;Odchozí úhrada;;Vklad;;;
+31.01.2025;31.01.2025;;;-99,00;CZK;;;;0;0;0;KBT0000000006;Poplatek za tarif;;;;;

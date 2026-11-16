@@ -11,6 +11,10 @@ data/
 # Generated demo data (fictitious portfolio, scripts/generate-demo.ts) - never put real exports here
 !demo/degiro/*.csv
 !demo/xtb/*.xlsx
+# Generated demo bank statements (fictitious household, scripts/generate-demo-banks.ts)
+!demo/fio/*.csv
+!demo/kb/*.csv
+!demo/rb/*.csv
 
 # Python
 __pycache__/

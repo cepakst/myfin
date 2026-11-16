@@ -4,14 +4,17 @@ import type { InstrumentDetail, Snapshot } from '../server/engine';
 import type { Settings } from '../core/settings';
 import type { DateRange, ImportMode } from '../core/exportStore';
 import type { CommitResult, ImportPreview, InboxFile } from '../server/importer';
+import type { AccountsSnapshot } from '../server/accountsEngine';
+import type { AccountsConfig } from '../core/accounts/analytics';
 
-export type { Snapshot, InstrumentDetail, Settings, ImportPreview, CommitResult, InboxFile };
+export type { Snapshot, InstrumentDetail, Settings, ImportPreview, CommitResult, InboxFile, AccountsSnapshot, AccountsConfig };
 
 export interface Status {
   status: 'idle' | 'loading' | 'ready' | 'error';
   progress: string[];
   error?: string;
   generatedAt?: string;
+  accountsGeneratedAt?: string;
 }
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
@@ -40,6 +43,8 @@ export const api = {
   importReplan: (id: string, range: DateRange) => post<ImportPreview>('/api/import/replan', { id, range }),
   importCommit: (id: string, mode: ImportMode, range?: DateRange) => post<CommitResult>('/api/import/commit', { id, mode, range }),
   importCancel: (id: string) => post<{ ok: boolean }>('/api/import/cancel', { id }),
+  accounts: () => json<AccountsSnapshot>('/api/accounts'),
+  saveAccountsConfig: (c: AccountsConfig) => json<AccountsSnapshot>('/api/accounts/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) }),
 };
 
 function post<T>(url: string, body: unknown): Promise<T> {
@@ -61,7 +66,16 @@ export function useStatus() {
       void qc.invalidateQueries({ queryKey: ['instrument'] });
     }
   }, [gen, qc]);
+  const accGen = q.data?.accountsGeneratedAt;
+  useEffect(() => {
+    if (accGen) void qc.invalidateQueries({ queryKey: ['accounts'] });
+  }, [accGen, qc]);
   return q;
+}
+
+/** Accounts module snapshot (available before the investment computation finishes) */
+export function useAccounts() {
+  return useQuery({ queryKey: ['accounts'], queryFn: api.accounts, staleTime: Infinity, retry: false });
 }
 
 export function useSnapshot() {

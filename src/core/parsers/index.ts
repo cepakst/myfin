@@ -1,5 +1,6 @@
+import { detectBankKind } from '../accounts/bankTables.js';
 import { sortRecords } from '../exportStore.js';
-import { headerSignature, readDegiroTable, writeCsv, type ExportTable } from '../exportTables.js';
+import { headerSignature, readDegiroTable, writeCsv, type BankTableKind, type ExportTable } from '../exportTables.js';
 import { emptyLedger, type Ledger } from '../types.js';
 import { parseDegiroAccount, parseDegiroTransactions } from './degiro.js';
 import { loadXtbWorkbook, parseXtbXlsx } from './xtb.js';
@@ -9,10 +10,14 @@ export interface InputFile {
   data: Uint8Array;
 }
 
-type Kind = 'DEGIRO_TX' | 'DEGIRO_ACCOUNT' | 'XTB' | 'UNKNOWN';
+export type FileKind = 'DEGIRO_TX' | 'DEGIRO_ACCOUNT' | 'XTB' | BankTableKind | 'UNKNOWN';
+type Kind = FileKind;
 
 export function detectFileKind(name: string, data: Uint8Array): Kind {
   const lower = name.toLowerCase();
+  // bank statements (accounts module) are CSV files; they never reach the investment ledger
+  const bank = detectBankKind(name, data);
+  if (bank) return bank;
   if (lower.endsWith('.zip') || lower.endsWith('.xlsx')) return 'XTB';
   if (lower.endsWith('.csv')) {
     const head = new TextDecoder('utf-8').decode(data.slice(0, 600)).split(/\r?\n/)[0] ?? '';
@@ -49,6 +54,7 @@ function combineDegiro(files: InputFile[], kind: 'DEGIRO_TX' | 'DEGIRO_ACCOUNT',
   }));
 }
 
+/** Investment ledger. Bank statements among `files` are skipped (they belong to the accounts module). */
 export async function buildLedger(files: InputFile[]): Promise<Ledger> {
   const ledger = emptyLedger();
   const kinds = files.map((f) => ({ f, kind: detectFileKind(f.name, f.data) }));

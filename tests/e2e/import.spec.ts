@@ -15,6 +15,8 @@ function fixtureListing(dir = FIXTURES): string[] {
   });
 }
 let fixturesBefore: string[] = [];
+let fixturesGitBefore = '';
+const fixturesGitStatus = () => execFileSync('git', ['status', '--porcelain', '--', FIXTURES], { encoding: 'utf8' }).trim();
 
 const FIXTURE_TX = readFileSync('tests/e2e/fixtures/degiro/Transactions.csv', 'utf8');
 const HEADER = FIXTURE_TX.split(/\r?\n/)[0];
@@ -55,6 +57,7 @@ test.describe.configure({ mode: 'serial' });
 test.describe('import of exports', () => {
   test.beforeAll(() => {
     fixturesBefore = fixtureListing();
+    fixturesGitBefore = fixturesGitStatus();
   });
 
   // the fixtures folder is the read-only exports folder: restore the store (not the folder) afterwards
@@ -63,7 +66,8 @@ test.describe('import of exports', () => {
     await restoreFixture(page);
     await page.close();
     expect(fixtureListing()).toEqual(fixturesBefore);
-    expect(execFileSync('git', ['status', '--porcelain', '--', FIXTURES], { encoding: 'utf8' }).trim()).toBe('');
+    // unchanged against the state before the tests (new, not yet committed fixture files show up in both)
+    expect(fixturesGitStatus()).toBe(fixturesGitBefore);
   });
 
   test('storage shows the imported units and the fixture files in the exports folder are listed as imported', async ({ page }) => {
@@ -71,7 +75,13 @@ test.describe('import of exports', () => {
     expect(txUnit(s).coverage).toEqual([{ from: '2020-01-05', to: '2024-09-20' }]);
     expect(txUnit(s).years.map((y: any) => y.year)).toEqual([2020, 2022, 2023, 2024]);
     expect(s.storage.loose).toBeUndefined();
-    expect(s.storage.inbox.map((f: any) => `${f.path}:${f.status}`).sort()).toEqual(['degiro/Account.csv:imported', 'degiro/Transactions.csv:imported']);
+    expect(s.storage.inbox.map((f: any) => `${f.path}:${f.status}`).sort()).toEqual([
+      'degiro/Account.csv:imported',
+      'degiro/Transactions.csv:imported',
+      'fio/Vypis_z_uctu-2101112223_20250101-20250131_cislo-1.csv:imported',
+      'kb/Vypis_9876543210_20250101_20250131.csv:imported',
+      'rb/Pohyby_1112223335_20250101_20250131.csv:imported',
+    ]);
     await page.goto('/#/nastaveni');
     const box = page.getByTestId('storage');
     await expect(box).toContainText('Degiro – transakce: 5. 1. 2020 – 20. 9. 2024');
@@ -81,8 +91,9 @@ test.describe('import of exports', () => {
     const inboxBox = page.getByTestId('inbox');
     await expect(inboxBox).toContainText('degiro/Transactions.csv');
     await expect(inboxBox).toContainText('degiro/Account.csv');
-    await expect(inboxBox.getByText('importováno')).toHaveCount(2);
-    await expect(inboxBox.getByRole('button')).toHaveCount(2); // every non-busy file offers an explicit (re)import
+    await expect(inboxBox).toContainText('fio/Vypis_z_uctu-2101112223_20250101-20250131_cislo-1.csv');
+    await expect(inboxBox.getByText('importováno')).toHaveCount(5);
+    await expect(inboxBox.getByRole('button')).toHaveCount(5); // every non-busy file offers an explicit (re)import
   });
 
   test('an export with only new rows is merged without a dialog', async ({ page }) => {

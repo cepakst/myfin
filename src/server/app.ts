@@ -4,6 +4,8 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyReply } from 'fastify';
 import type { DateRange, ImportMode } from '../core/exportStore.js';
 import { mergeSettings, type Settings } from '../core/settings.js';
+import { sanitizeAccountsConfig } from '../core/accounts/analytics.js';
+import { accountsState, refreshAccounts, saveAccountsConfig } from './accountsEngine.js';
 import { computeSnapshot, instrumentDetail, state } from './engine.js';
 import { cancelImport, commitImport, ImportError, isInside, previewInbox, previewUpload, replanImport } from './importer.js';
 import { DATA_DIR, DEFAULT_EXPORTS_DIR, DEMO_SETTINGS_FILE, STORE_DIR, WEB_DIST } from './paths.js';
@@ -55,7 +57,30 @@ export async function createServer() {
     return true;
   };
 
-  app.get('/api/status', async () => ({ status: state.status, progress: state.progress, error: state.error, generatedAt: state.snapshot?.generatedAt }));
+  app.get('/api/status', async () => ({
+    status: state.status,
+    progress: state.progress,
+    error: state.error,
+    generatedAt: state.snapshot?.generatedAt,
+    accountsGeneratedAt: accountsState.snapshot?.generatedAt,
+  }));
+
+  // --- accounts module (bank statements) ---
+  app.get('/api/accounts', async (_req, reply) => {
+    if (!accountsState.snapshot) return reply.code(503).send({ status: state.status, progress: state.progress, error: state.error });
+    return accountsState.snapshot;
+  });
+
+  app.put<{ Body: unknown }>('/api/accounts/config', { bodyLimit: 512 * 1024 }, async (req, reply) => {
+    if (!accountsState.snapshot) return reply.code(503).send({ error: 'Data se ještě načítají' });
+    // a malformed request must never overwrite the saved configuration with an empty one
+    const body = req.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body) || body.version !== 1) return reply.code(400).send({ error: 'Neplatné nastavení účtů' });
+    // demo mode keeps its own configuration file, so the user's real configuration is never touched
+    const config = sanitizeAccountsConfig(req.body);
+    saveAccountsConfig(accountsState.demo, config);
+    return refreshAccounts();
+  });
 
   app.get('/api/snapshot', async (_req, reply) => {
     if (!state.snapshot) return reply.code(503).send({ status: state.status, progress: state.progress, error: state.error });
@@ -107,6 +132,8 @@ export async function createServer() {
     if (enabled !== !!settings.demo) {
       settings = mergeSettings({ ...settings, demo: enabled || undefined });
       saveSettings(settings);
+      // never serve (or save configuration for) the other mode's accounts while recomputing
+      accountsState.snapshot = undefined;
       recompute();
     }
     return { demo: enabled, settings: active() };
