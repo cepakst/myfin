@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { detectBankKind } from '../core/accounts/bankTables.js';
+import { buildBankLedger } from '../core/accounts/ledger.js';
 import { computeInsights, type Insights } from '../core/analytics/insights.js';
 import { buildTips, type FxMethodComparison, type Tip } from '../core/analytics/optimization.js';
 import { computePerformance, type PerformanceResult } from '../core/analytics/performance.js';
@@ -19,6 +21,7 @@ import { MarketData, type SymbolInfo } from './market.js';
 import { DEFAULT_EXPORTS_DIR, DEMO_DIR, STORE_DIR } from './paths.js';
 import { loadExportsForSnapshot, type StorageInfo } from './importer.js';
 import { listExportFiles } from './store.js';
+import { computeAccounts } from './accountsEngine.js';
 
 export interface RealizationView extends Realization {
   name: string;
@@ -198,9 +201,11 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
     const loaded = opts.demo
       ? { files: listExportFiles(exportsDir).map((p) => ({ name: p, data: new Uint8Array(readFileSync(p)) })), storage: undefined, messages: [] as string[] }
       : await loadExportsForSnapshot(STORE_DIR, exportsDir);
-    const files = loaded.files.map((f) => f.name);
+    // investment files only (bank statements belong to the accounts module)
+    const files = loaded.files.filter((f) => !detectBankKind(f.name, f.data)).map((f) => f.name);
     log(opts.demo ? `Načítám ${files.length} souborů z ${exportsDir}` : `Načítám uložená data (${files.length} souborů) a nové exporty z ${exportsDir}`);
     const ledger = await buildLedger(loaded.files);
+    const bankLedger = buildBankLedger(loaded.files);
     for (const m of loaded.messages) ledger.warnings.push({ source: 'Import', message: m });
     const storage = loaded.storage;
     for (const [id, c] of Object.entries(settings.countryOverrides)) {
@@ -215,10 +220,29 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
     for (let y = firstYear; y <= lastYear; y++) years.push(y);
 
     log('Kurzy ČNB');
-    const cnb = await loadCnbFixings(firstYear, lastYear, log);
+    // foreign currency bank accounts are converted with CNB rates from their first movement on
+    const bankDates = [
+      ...bankLedger.txs.slice(0, 1).map((t) => t.date),
+      ...[...bankLedger.accounts.values()].flatMap((a) => a.balancePoints.map((p) => p.date)),
+    ].sort();
+    const bankFirst = [...bankLedger.accounts.values()].some((a) => a.currency !== 'CZK') ? bankDates[0] : undefined;
+    const cnbFirstYear = bankFirst ? Math.min(firstYear, Number(bankFirst.slice(0, 4))) : firstYear;
+    const cnb = await loadCnbFixings(cnbFirstYear, lastYear, log);
     for (const e of cnb.errors) ledger.warnings.push({ source: 'ČNB', message: e });
     const fixings: CnbFixing[] = cnb.fixings;
     const fx = new FxRates(fixings, settings.fx);
+
+    // the accounts module needs only the bank files and CNB rates: show it before market data load
+    computeAccounts(bankLedger, {
+      demo: !!opts.demo,
+      toCzk: (a, c, d) => {
+        try {
+          return fx.toCzkDaily(a, c, d);
+        } catch {
+          return null;
+        }
+      },
+    });
 
     const taxConv = convOf(fx, 'tax');
     const dailyConv = convOf(fx, 'daily');

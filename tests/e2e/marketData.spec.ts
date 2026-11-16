@@ -23,7 +23,7 @@ test.describe('instruments without market data', () => {
     test.skip(missing.length === 0, 'all synthetic instruments resolved');
     const held = snap.positions.find((p: { qty: number; instrumentId: string }) => p.qty > 1e-9 && missing.some((i: { id: string }) => i.id === p.instrumentId));
 
-    await page.goto('/#/');
+    await page.goto('/#/investice');
     const alert = page.locator('main').getByRole('alert').filter({ hasText: 'Instrumenty bez tržních dat' });
     await expect(alert).toContainText(String(missing.length));
     await expect(alert.getByRole('link', { name: 'Nastavení a data' })).toHaveAttribute('href', '#/nastaveni');

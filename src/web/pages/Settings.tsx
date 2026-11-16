@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, useSnapshot, type ImportPreview, type InboxFile, type Settings } from '../api';
 import { ImportDialog, MODE_LABEL, type ImportDecision } from '../ImportDialog';
+import { AccountsSettings } from './accounts/AccountsSettings';
 import { Section } from '../components';
 import { DataGrid } from '../DataGrid';
 import { useSetDemo } from '../demo';
@@ -135,7 +136,7 @@ export function SettingsPage() {
         </Stack>
       </Section>
 
-      <Section title="Exporty od brokerů">
+      <Section title="Exporty od brokerů a výpisy z účtů">
         <Stack>
           <TextInput
             label="Složka s exporty"
@@ -162,7 +163,7 @@ export function SettingsPage() {
               <div>
                 <Text>{demo ? 'V demo režimu nelze importovat' : 'Přetáhněte nové exporty sem'}</Text>
                 <Text size="xs" c="dimmed">
-                  Degiro: Transactions.csv a Account.csv · XTB: export .zip nebo .xlsx. Stačí export za nové období – data se uloží po letech a sloučí s uloženými. Pokud se export v překrývajícím se období od uložených dat liší, zeptám se, co s rozdíly.
+                  Degiro: Transactions.csv a Account.csv · XTB: export .zip nebo .xlsx · Fio, Komerční banka a Raiffeisenbank: výpis nebo pohyby v CSV. Stačí export za nové období – data se uloží po letech a sloučí s uloženými. Pokud se export v překrývajícím se období od uložených dat liší, zeptám se, co s rozdíly.
                 </Text>
               </div>
             </Group>
@@ -223,7 +224,7 @@ export function SettingsPage() {
                   ))}
                   {s.storage.inbox.some((f) => f.status === 'unsupported') && (
                     <Text size="xs" c="dimmed">
-                      Dalších {s.storage.inbox.filter((f) => f.status === 'unsupported').length} souborů není export Degiro ani XTB – ignorují se.
+                      Dalších {s.storage.inbox.filter((f) => f.status === 'unsupported').length} souborů není podporovaný export (Degiro, XTB, výpis Fio, KB nebo Raiffeisenbank v CSV) – ignorují se.
                     </Text>
                   )}
                 </Stack>
@@ -262,6 +263,8 @@ export function SettingsPage() {
           </Text>
         </Stack>
       </Section>
+
+      <AccountsSettings />
 
       <Section title="Daňová situace a přepočet měn">
         <Stack>

@@ -1,0 +1,13 @@
+﻿"Výpis č. 12/2023 z účtu ""2101234567/2010"""
+"Majitel účtu: Novák Jan, Ukázková 1, Praha"
+"Vytvořeno v aplikaci Internetbanking 2.0: 31.12.2023 08:00:00"
+"Období: 01.12.2023 - 31.12.2023"
+"Počáteční stav účtu k 01.12.2023: 75824,92 CZK"
+"Koncový stav účtu k 31.12.2023: 80975,72 CZK"
+"Suma příjmů: 5177,41 CZK"
+"Suma výdajů: -26,61 CZK"
+
+"ID operace";"Datum";"Objem";"Měna";"Protiúčet";"Název protiúčtu";"Kód banky";"Název banky";"KS";"VS";"SS";"Poznámka";"Zpráva pro příjemce";"Typ";"Provedl";"Upřesnění";"Poznámka";"BIC";"ID pokynu"
+"10011720120";"14.12.2023";"5000,00";"CZK";"19-2000145398";"NOVAK JAN";"0100";"Komerční banka, a.s.";"";"";"";"Spoření";"Spoření";"Bezhotovostní příjem";"";"";"";"";"10022466203"
+"10011728039";"31.12.2023";"177,41";"CZK";"";"";"";"";"";"";"";"";"";"Připsaný úrok";"";"";"";"";""
+"10011735958";"31.12.2023";"-26,61";"CZK";"";"";"";"";"";"";"";"";"";"Odvod daně z úroků";"";"";"";"";""

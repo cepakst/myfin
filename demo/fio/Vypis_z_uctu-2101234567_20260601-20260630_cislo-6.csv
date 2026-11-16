@@ -1,0 +1,13 @@
+﻿"Výpis č. 6/2026 z účtu ""2101234567/2010"""
+"Majitel účtu: Novák Jan, Ukázková 1, Praha"
+"Vytvořeno v aplikaci Internetbanking 2.0: 30.06.2026 08:00:00"
+"Období: 01.06.2026 - 30.06.2026"
+"Počáteční stav účtu k 01.06.2026: 236034,28 CZK"
+"Koncový stav účtu k 30.06.2026: 241582,26 CZK"
+"Suma příjmů: 5644,68 CZK"
+"Suma výdajů: -96,70 CZK"
+
+"ID operace";"Datum";"Objem";"Měna";"Protiúčet";"Název protiúčtu";"Kód banky";"Název banky";"KS";"VS";"SS";"Poznámka";"Zpráva pro příjemce";"Typ";"Provedl";"Upřesnění";"Poznámka";"BIC";"ID pokynu"
+"10021167487";"15.06.2026";"5000,00";"CZK";"19-2000145398";"NOVAK JAN";"0100";"Komerční banka, a.s.";"";"";"";"Spoření";"Spoření";"Bezhotovostní příjem";"";"";"";"";"10022703773"
+"10021175406";"30.06.2026";"644,68";"CZK";"";"";"";"";"";"";"";"";"";"Připsaný úrok";"";"";"";"";""
+"10021183325";"30.06.2026";"-96,70";"CZK";"";"";"";"";"";"";"";"";"";"Odvod daně z úroků";"";"";"";"";""

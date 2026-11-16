@@ -17,6 +17,9 @@ export const WEB_DIST = resolve(process.env.MYFIN_WEB_DIST ?? join(ROOT, 'dist',
 export const DEMO_DIR = resolve(process.env.MYFIN_DEMO_DIR ?? join(ROOT, 'demo'));
 /** Demo mode keeps its own settings so experiments with demo data never touch the user's real settings */
 export const DEMO_SETTINGS_FILE = join(DATA_DIR, 'settings.demo.json');
+/** Accounts module configuration (aliases, product types, balances entered by the user, own accounts) */
+export const ACCOUNTS_FILE = join(DATA_DIR, 'accounts.json');
+export const DEMO_ACCOUNTS_FILE = join(DATA_DIR, 'accounts.demo.json');
 
 export function ensureDir(p: string): string {
   mkdirSync(p, { recursive: true });

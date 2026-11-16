@@ -16,7 +16,7 @@ test.describe('metric explanations', () => {
   const statCard = (page: Page, label: string) => page.getByText(label, { exact: true }).locator('xpath=../..');
 
   test('overview: every stat card has an explanation and TWR/XIRR are defined exactly', async ({ page }) => {
-    await page.goto('/#/');
+    await page.goto('/#/investice');
     const labels = ['Hodnota portfolia', 'Celkový zisk', 'Výnos (TWR) celkem', /^Letos \(/, 'Dividendy (čistě)', 'Poplatky celkem', 'Realizované zisky / ztráty', /^Odhad daně /];
     for (const l of labels) {
       const card = typeof l === 'string' ? statCard(page, l) : page.getByText(l).locator('xpath=../..');

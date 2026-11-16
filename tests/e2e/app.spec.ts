@@ -6,6 +6,9 @@ const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { versio
 
 const PAGES = [
   { label: 'Přehled', hash: '#/' },
+  { label: 'Přehled účtů', hash: '#/ucty' },
+  { label: 'Transakce', hash: '#/ucty/transakce' },
+  { label: 'Přehled investic', hash: '#/investice' },
   { label: 'Výnosy po letech', hash: '#/roky' },
   { label: 'Portfolio a loty', hash: '#/portfolio' },
   { label: 'Realizované obchody', hash: '#/obchody' },

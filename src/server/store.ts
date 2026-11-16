@@ -36,7 +36,13 @@ export function listExportFiles(dir: string): string[] {
 }
 
 /** Files in the layout written by the import (paths relative to the exports dir, '/' separated). */
-const CANONICAL = [/^degiro\/\d{4}\/(Transactions|Account)\.csv$/, /^xtb\/[\w-]+\/\d{4}\/[A-Z]{3}_[\w-]+_\d{4}\.xlsx$/, /^xtb\/[\w-]+\/[A-Z]{3}_[\w-]+_open-positions\.xlsx$/];
+const CANONICAL = [
+  /^degiro\/\d{4}\/(Transactions|Account)\.csv$/,
+  /^xtb\/[\w-]+\/\d{4}\/[A-Z]{3}_[\w-]+_\d{4}\.xlsx$/,
+  /^xtb\/[\w-]+\/[A-Z]{3}_[\w-]+_open-positions\.xlsx$/,
+  /^banks\/(fio|kb|rb)\/[\w-]+\/\d{4}\/transactions\.csv$/,
+  /^banks\/(fio|kb|rb)\/[\w-]+\/balances\.csv$/,
+];
 
 export function relExportPath(dir: string, file: string): string {
   return relative(dir, file).split(sep).join('/');

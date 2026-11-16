@@ -1,0 +1,13 @@
+﻿"Výpis č. 7/2025 z účtu ""2101234567/2010"""
+"Majitel účtu: Novák Jan, Ukázková 1, Praha"
+"Vytvořeno v aplikaci Internetbanking 2.0: 31.07.2025 08:00:00"
+"Období: 01.07.2025 - 31.07.2025"
+"Počáteční stav účtu k 01.07.2025: 175904,62 CZK"
+"Koncový stav účtu k 31.07.2025: 181303,53 CZK"
+"Suma příjmů: 5469,31 CZK"
+"Suma výdajů: -70,40 CZK"
+
+"ID operace";"Datum";"Objem";"Měna";"Protiúčet";"Název protiúčtu";"Kód banky";"Název banky";"KS";"VS";"SS";"Poznámka";"Zpráva pro příjemce";"Typ";"Provedl";"Upřesnění";"Poznámka";"BIC";"ID pokynu"
+"10017691046";"14.07.2025";"5000,00";"CZK";"19-2000145398";"NOVAK JAN";"0100";"Komerční banka, a.s.";"";"";"";"Spoření";"Spoření";"Bezhotovostní příjem";"";"";"";"";"10022616664"
+"10017698965";"31.07.2025";"469,31";"CZK";"";"";"";"";"";"";"";"";"";"Připsaný úrok";"";"";"";"";""
+"10017706884";"31.07.2025";"-70,40";"CZK";"";"";"";"";"";"";"";"";"";"Odvod daně z úroků";"";"";"";"";""

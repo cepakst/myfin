@@ -23,6 +23,7 @@
     "smoke:app": "node scripts/smoke-app.mjs",
     "icons": "tsx scripts/generate-icons.ts",
     "demo:generate": "tsx scripts/generate-demo.ts",
+    "demo:banks": "tsx scripts/generate-demo-banks.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

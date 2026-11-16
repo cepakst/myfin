@@ -1,0 +1,5 @@
+﻿"Datum provedení";"Datum zaúčtování";"Číslo účtu";"Název účtu";"Kategorie transakce";"Číslo protiúčtu";"Název protiúčtu";"Typ transakce";"Zpráva";"Poznámka";"VS";"KS";"SS";"Zaúčtovaná částka";"Měna účtu";"Původní částka";"Původní měna";"Poplatky";"Id transakce";"Vlastní poznámka";"Název obchodníka";"Město"
+"13.01.2025";"13.01.2025";"1112223335/5500";"eKonto TEST";"Platba";"9876543210/0100";"JAN TESTOVAC";"Příchozí úhrada";"Kapesné na kartu";"";"";"";"";"8000,00";"CZK";"";"";"";"RBT0000001";"";"";""
+"16.01.2025";"16.01.2025";"1112223335/5500";"eKonto TEST";"Platba kartou";"";"";"Platba kartou";"PK: 5168 **** **** 0000";"";"";"";"";"-450,50";"CZK";"";"";"";"RBT0000002";"";"ALBERT TEST";"PRAHA"
+"18.01.2025";"18.01.2025";"1112223335/5500";"eKonto TEST";"Platba kartou";"";"";"Platba kartou";"PK: 5168 **** **** 0000";"";"";"";"";"-1200,00";"CZK";"";"";"";"RBT0000003";"";"SHELL TEST";"BRNO"
+"25.01.2025";"25.01.2025";"1112223335/5500";"eKonto TEST";"Výběr hotovosti";"";"";"Výběr z bankomatu";"";"";"";"";"";"-2000,00";"CZK";"";"";"";"RBT0000004";"";"";"PRAHA"
