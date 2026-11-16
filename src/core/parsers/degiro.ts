@@ -52,7 +52,8 @@ function upsertInstrument(ledger: Ledger, isin: string, name: string, currency: 
 }
 
 interface TxRow {
-  line: number;
+  /** stable id independent of the line number, so it survives splitting/merging files */
+  id: string;
   date: string;
   dateTime: string;
   product: string;
@@ -90,6 +91,7 @@ export function parseDegiroTransactions(text: string, ledger: Ledger, file = 'Tr
   const feeHasOwnCurrency = iFee >= 0 && !/(EUR|CZK|USD)$/i.test(h[iFee].trim());
 
   const txRows: TxRow[] = [];
+  const seen = new Map<string, number>();
   for (let li = 1; li < rows.length; li++) {
     const r = rows[li];
     if (!r[iDate] || !r[iIsin]) continue;
@@ -112,8 +114,12 @@ export function parseDegiroTransactions(text: string, ledger: Ledger, file = 'Tr
       const f = parseNum(r[iAutoFx]);
       if (Number.isFinite(f) && f !== 0) fees.push({ amount: Math.abs(f), currency: baseCurrency });
     }
+    const orderId = (r[iOrder] || '').trim();
+    const base = `DEGIRO:${dateTime}:${orderId || 'corp'}:${r[iIsin].trim()}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
     txRows.push({
-      line: li + 1,
+      id: n === 1 ? base : `${base}#${n}`,
       date,
       dateTime,
       product: r[iProduct],
@@ -124,7 +130,7 @@ export function parseDegiroTransactions(text: string, ledger: Ledger, file = 'Tr
       currency: local.currency,
       amount: local.amount,
       fees,
-      orderId: (r[iOrder] || '').trim(),
+      orderId,
     });
     upsertInstrument(ledger, r[iIsin].trim(), r[iProduct], local.currency, iExchange >= 0 ? r[iExchange].trim() : undefined, dateTime);
   }
@@ -213,7 +219,7 @@ export function parseDegiroTransactions(text: string, ledger: Ledger, file = 'Tr
 
 function toTrade(t: TxRow): Trade {
   return {
-    id: `DEGIRO:${t.line}:${t.orderId || 'corp'}`,
+    id: t.id,
     broker: BROKER,
     instrumentId: t.isin,
     dateTime: t.dateTime,
@@ -273,6 +279,7 @@ export function parseDegiroAccount(text: string, ledger: Ledger, file = 'Account
   const raw: Raw[] = [];
   const txTaxes: { isin: string; date: string; orderId?: string; fee: Money; desc: string }[] = [];
   let count = 0;
+  const seen = new Map<string, number>();
   for (let li = 1; li < rows.length; li++) {
     const r = rows[li];
     if (!r[iDate]) continue;
@@ -280,7 +287,7 @@ export function parseDegiroAccount(text: string, ledger: Ledger, file = 'Account
     const desc = (r[iDesc] || '').trim();
     const rule = ACCOUNT_RULES.find((x) => x.re.test(desc));
     if (!rule) {
-      ledger.warnings.push({ source: file, message: `Neznámý typ pohybu na řádku ${li + 1}: "${desc}"` });
+      ledger.warnings.push({ source: file, message: `Neznámý typ pohybu ${r[iDate]} ${iTime >= 0 ? r[iTime] : ''}: "${desc}"` });
       continue;
     }
     if (rule.kind === 'IGNORE') continue;
@@ -297,8 +304,11 @@ export function parseDegiroAccount(text: string, ledger: Ledger, file = 'Account
       txTaxes.push({ isin: isin ?? '', date, orderId: iOrder >= 0 ? (r[iOrder] || '').trim() || undefined : undefined, fee: { amount: -money.amount, currency: money.currency }, desc });
       continue;
     }
+    const base = `DEGIRO:A:${dateTime}:${isin ?? ''}:${rule.kind}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
     raw.push({
-      id: `DEGIRO:A${li + 1}`,
+      id: n === 1 ? base : `${base}#${n}`,
       broker: BROKER,
       kind: rule.kind,
       dateTime,

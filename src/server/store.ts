@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { mergeSettings, type Settings } from '../core/settings.js';
 import { DATA_DIR, ensureDir, SETTINGS_FILE } from './paths.js';
 
@@ -28,9 +28,31 @@ export function listExportFiles(dir: string): string[] {
       const st = statSync(p);
       if (st.isDirectory()) {
         if (!n.startsWith('_')) walk(p);
-      } else if (EXPORT_EXT.test(n)) out.push(p);
+      } else if (EXPORT_EXT.test(n) && !n.startsWith('~$')) out.push(p); // ~$ = Excel lock file
     }
   };
   walk(dir);
   return out.sort();
+}
+
+/** Files in the layout written by the import (paths relative to the exports dir, '/' separated). */
+const CANONICAL = [/^degiro\/\d{4}\/(Transactions|Account)\.csv$/, /^xtb\/[\w-]+\/\d{4}\/[A-Z]{3}_[\w-]+_\d{4}\.xlsx$/, /^xtb\/[\w-]+\/[A-Z]{3}_[\w-]+_open-positions\.xlsx$/];
+
+export function relExportPath(dir: string, file: string): string {
+  return relative(dir, file).split(sep).join('/');
+}
+
+export function isCanonicalExport(relPath: string): boolean {
+  return CANONICAL.some((re) => re.test(relPath));
+}
+
+/**
+ * Splits the exports dir into the stored year files (loaded) and loose files the user copied there
+ * (not loaded until imported, otherwise overlapping periods would be counted twice).
+ */
+export function classifyExportFiles(dir: string): { files: string[]; loose: string[] } {
+  const files: string[] = [];
+  const loose: string[] = [];
+  for (const p of listExportFiles(dir)) (isCanonicalExport(relExportPath(dir, p)) ? files : loose).push(p);
+  return { files, loose };
 }

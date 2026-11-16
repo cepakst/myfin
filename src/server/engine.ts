@@ -16,7 +16,8 @@ import type { CashEvent, Instrument, Ledger, Trade } from '../core/types.js';
 import { todayIso } from '../core/util.js';
 import { loadCnbFixings } from './cnb.js';
 import { MarketData, type SymbolInfo } from './market.js';
-import { DEFAULT_EXPORTS_DIR, DEMO_DIR } from './paths.js';
+import { DEFAULT_EXPORTS_DIR, DEMO_DIR, STORE_DIR } from './paths.js';
+import { loadExportsForSnapshot, type StorageInfo } from './importer.js';
 import { listExportFiles } from './store.js';
 
 export interface RealizationView extends Realization {
@@ -40,6 +41,8 @@ export interface Snapshot {
   exportsDir: string;
   files: string[];
   sources: Ledger['sources'];
+  /** Stored year files, coverage and the import status of files in the exports folder (not in demo mode) */
+  storage?: StorageInfo;
   warnings: { source: string; message: string }[];
   years: number[];
   instruments: (Instrument & { symbol: string | null; symbolSource: string; symbolNote?: string; hasMarket: boolean })[];
@@ -191,9 +194,15 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
   };
   try {
     const exportsDir = opts.demo ? DEMO_DIR : settings.exportsDir || DEFAULT_EXPORTS_DIR;
-    const files = listExportFiles(exportsDir);
-    log(`Načítám ${files.length} souborů z ${exportsDir}`);
-    const ledger = await buildLedger(files.map((p) => ({ name: p, data: new Uint8Array(readFileSync(p)) })));
+    // new exports in the user's exports folder are imported into the store first
+    const loaded = opts.demo
+      ? { files: listExportFiles(exportsDir).map((p) => ({ name: p, data: new Uint8Array(readFileSync(p)) })), storage: undefined, messages: [] as string[] }
+      : await loadExportsForSnapshot(STORE_DIR, exportsDir);
+    const files = loaded.files.map((f) => f.name);
+    log(opts.demo ? `Načítám ${files.length} souborů z ${exportsDir}` : `Načítám uložená data (${files.length} souborů) a nové exporty z ${exportsDir}`);
+    const ledger = await buildLedger(loaded.files);
+    for (const m of loaded.messages) ledger.warnings.push({ source: 'Import', message: m });
+    const storage = loaded.storage;
     for (const [id, c] of Object.entries(settings.countryOverrides)) {
       const inst = ledger.instruments.get(id);
       if (inst && c) inst.country = c;
@@ -310,6 +319,7 @@ export async function computeSnapshot(settings: Settings, opts: { refreshMarket?
       exportsDir,
       files,
       sources: ledger.sources,
+      storage,
       warnings: ledger.warnings,
       years,
       instruments: [...ledger.instruments.values()].map((i) => ({

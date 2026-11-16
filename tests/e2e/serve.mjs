@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 const dataDir = join(tmpdir(), 'myfin-e2e');
 rmSync(dataDir, { recursive: true, force: true });
 process.env.MYFIN_DATA = dataDir;
+// the exports folder is only read; imported data go to <data>/store
 process.env.MYFIN_EXPORTS = resolve('tests/e2e/fixtures');
 process.env.PORT = process.env.E2E_PORT ?? '5199';
 

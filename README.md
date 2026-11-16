@@ -81,10 +81,21 @@ git push --follow-tags
 
 | Broker | Co exportovat |
 | ------ | ------------- |
-| Degiro | *Transakce* (`Transactions.csv`) a *Výpis z účtu* (`Account.csv`), vždy za **celé období** od založení účtu |
-| XTB    | *Historie účtu* – export `.zip` (nebo `.xlsx`) za celé období |
+| Degiro | *Transakce* (`Transactions.csv`) a *Výpis z účtu* (`Account.csv`) |
+| XTB    | *Historie účtu* – export `.zip` (nebo `.xlsx`) |
 
-Nový export stejného typu nahradí předchozí. Starý se přesune do `exports/_archiv`.
+Poprvé exportujte celé období od založení účtu. Potom stačí exportovat jen nové období (např. posledních pár měsíců). Export buď nakopírujte do složky s exporty (`exports/`, nebo vlastní složka v Nastavení), nebo ho přetáhněte do **Nastavení a data**.
+
+Do složky s exporty aplikace nic nezapisuje. Nové soubory v ní při načtení sama najde (podle obsahu, takže stejný soubor importuje jen jednou). Data uloží rozdělená po letech do svých dat (`data/store/degiro/2025/Transactions.csv`, `data/store/xtb/<účet>/2025/…`; v nainstalované aplikaci `%APPDATA%\myfin\data\store`, na macOS `~/Library/Application Support/myfin/data/store`). **Složku `data/store` nemažte.** Na rozdíl od `data/cache` obsahuje celou importovanou historii, i když staré exporty smažete.
+
+Pokud export jen přidává nové řádky, sloučí se automaticky. Pokud se v překrývajícím se období od uložených dat liší (chybí v něm uložené řádky), aplikace ukáže porovnání po letech a nabídne:
+
+- **Sloučit** – v období exportu platí nový export, mimo něj zůstanou uložená data;
+- **Ponechat stávající, přidat jen nové** – přidají se jen řádky z období, které ještě uložené není;
+- **Nahradit celou historii** – export se použije jako kompletní historie;
+- **Zrušit** – soubor se přeskočí.
+
+Soubory z exportní složky, které na rozhodnutí čekají, jsou v Nastavení označené „čeká na rozhodnutí“. Nahrazené verze uložených dat a originály exportů přetažených do aplikace se ukládají do `data/store/_archiv/<čas importu>/`.
 
 ### Demo data
 
