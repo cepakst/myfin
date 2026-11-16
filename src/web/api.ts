@@ -2,8 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { InstrumentDetail, Snapshot } from '../server/engine';
 import type { Settings } from '../core/settings';
+import type { DateRange, ImportMode } from '../core/exportStore';
+import type { CommitResult, ImportPreview, InboxFile } from '../server/importer';
 
-export type { Snapshot, InstrumentDetail, Settings };
+export type { Snapshot, InstrumentDetail, Settings, ImportPreview, CommitResult, InboxFile };
 
 export interface Status {
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -29,12 +31,20 @@ export const api = {
   setDemo: (enabled: boolean) => json<{ demo: boolean; settings: Settings }>('/api/demo', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) }),
   saveSettings: (s: Partial<Settings>) => json<{ settings: Settings }>('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }),
   reload: (refreshMarket = false) => json<{ started: boolean }>('/api/reload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshMarket }) }),
-  upload: (files: File[]) => {
+  importPreview: (file: File) => {
     const fd = new FormData();
-    for (const f of files) fd.append('file', f, f.name);
-    return json<{ saved: { file: string; kind: string }[] }>('/api/upload', { method: 'POST', body: fd });
+    fd.append('file', file, file.name);
+    return json<ImportPreview>('/api/import/preview', { method: 'POST', body: fd });
   },
+  importInbox: (path: string) => post<ImportPreview>('/api/import/inbox', { path }),
+  importReplan: (id: string, range: DateRange) => post<ImportPreview>('/api/import/replan', { id, range }),
+  importCommit: (id: string, mode: ImportMode, range?: DateRange) => post<CommitResult>('/api/import/commit', { id, mode, range }),
+  importCancel: (id: string) => post<{ ok: boolean }>('/api/import/cancel', { id }),
 };
+
+function post<T>(url: string, body: unknown): Promise<T> {
+  return json<T>(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+}
 
 /** Polls the engine status; refreshes the snapshot whenever a new computation finishes. */
 export function useStatus() {

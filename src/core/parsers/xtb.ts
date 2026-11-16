@@ -48,7 +48,7 @@ const SUFFIX_CURRENCY: Record<string, string> = {
 
 type Cell = ExcelJS.CellValue;
 
-function cellText(v: Cell): string {
+export function cellText(v: Cell): string {
   if (v === null || v === undefined) return '';
   if (typeof v === 'object') {
     if (v instanceof Date) return v.toISOString();
@@ -65,7 +65,7 @@ function cellNum(v: Cell): number {
   return parseNum(cellText(v));
 }
 
-function cellDate(v: Cell): Date | null {
+export function cellDate(v: Cell): Date | null {
   if (v instanceof Date) return v;
   if (typeof v === 'number') return new Date(Math.round((v - 25569) * 86400000));
   const s = cellText(v);
@@ -74,7 +74,7 @@ function cellDate(v: Cell): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function sheetRows(ws: ExcelJS.Worksheet): Cell[][] {
+export function sheetRows(ws: ExcelJS.Worksheet): Cell[][] {
   const out: Cell[][] = [];
   ws.eachRow({ includeEmpty: true }, (row) => {
     const vals = row.values as Cell[];
@@ -83,7 +83,7 @@ function sheetRows(ws: ExcelJS.Worksheet): Cell[][] {
   return out;
 }
 
-function headerIndex(rows: Cell[][], required: string[]): { idx: number; cols: Map<string, number> } | null {
+export function headerIndex(rows: Cell[][], required: string[]): { idx: number; cols: Map<string, number> } | null {
   for (let i = 0; i < Math.min(rows.length, 30); i++) {
     const texts = rows[i].map((c) => cellText(c).toLowerCase());
     if (required.every((r) => texts.includes(r.toLowerCase()))) {
@@ -149,12 +149,48 @@ const TYPE_RULES: TypeRule[] = [
   { re: /^(total|transfer)$/i, kind: 'IGNORE' },
 ];
 
+interface ZipStream {
+  on(event: 'data', cb: (chunk: Uint8Array) => void): ZipStream;
+  on(event: 'error', cb: (e: Error) => void): ZipStream;
+  on(event: 'end', cb: () => void): ZipStream;
+  pause(): ZipStream;
+  resume(): ZipStream;
+}
+
+const MAX_ZIP_ENTRIES = 20;
+const MAX_UNZIPPED_BYTES = 200 * 1024 * 1024;
+
 export async function loadXtbWorkbook(buf: Buffer | Uint8Array, fileName: string): Promise<{ name: string; data: Uint8Array }[]> {
   if (fileName.toLowerCase().endsWith('.zip')) {
     const zip = await JSZip.loadAsync(buf);
     const out: { name: string; data: Uint8Array }[] = [];
-    for (const f of Object.values(zip.files)) {
-      if (!f.dir && f.name.toLowerCase().endsWith('.xlsx')) out.push({ name: f.name, data: await f.async('uint8array') });
+    const entries = Object.values(zip.files).filter((f) => !f.dir && f.name.toLowerCase().endsWith('.xlsx'));
+    // guard against zip bombs: XTB exports are a few workbooks of a few MB
+    if (entries.length > MAX_ZIP_ENTRIES) throw new Error(`${fileName}: příliš mnoho souborů v archivu`);
+    let total = 0;
+    for (const f of entries) {
+      const declared = (f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0;
+      if (declared > MAX_UNZIPPED_BYTES) throw new Error(`${fileName}: soubor v archivu je příliš velký`);
+      // inflate as a stream and stop as soon as the limit is exceeded (the declared size can be forged)
+      const data = await new Promise<Uint8Array>((resolve, reject) => {
+        const chunks: Uint8Array[] = [];
+        // internalStream exists at runtime but is missing in the JSZip typings
+        const stream = (f as unknown as { internalStream(type: 'uint8array'): ZipStream }).internalStream('uint8array');
+        stream
+          .on('data', (chunk: Uint8Array) => {
+            total += chunk.byteLength;
+            if (total > MAX_UNZIPPED_BYTES) {
+              stream.pause();
+              reject(new Error(`${fileName}: rozbalený archiv je příliš velký`));
+              return;
+            }
+            chunks.push(chunk);
+          })
+          .on('error', (e: Error) => reject(e))
+          .on('end', () => resolve(Buffer.concat(chunks)))
+          .resume();
+      });
+      out.push({ name: f.name, data: new Uint8Array(data) });
     }
     return out;
   }
@@ -168,88 +204,91 @@ export async function parseXtbXlsx(data: Uint8Array, ledger: Ledger, file: strin
   const accountCurrency = /^([A-Z]{3})_/.exec(file.split(/[\\/]/).pop() ?? '')?.[1] ?? 'CZK';
 
   const cashWs = wb.worksheets.find((w) => /cash operation/i.test(w.name));
-  if (!cashWs) throw new Error(`${file}: chybí list "Cash Operations"`);
-  const rows = sheetRows(cashWs);
-  const hdr = headerIndex(rows, ['type', 'time', 'amount']);
-  if (!hdr) throw new Error(`${file}: nerozpoznaná hlavička listu Cash Operations`);
-  const c = (name: string) => hdr.cols.get(name) ?? -1;
-  const iType = c('type');
-  const iInstr = c('instrument');
-  const iTicker = c('ticker') >= 0 ? c('ticker') : c('symbol');
-  const iCat = c('category');
-  const iTime = c('time');
-  const iAmount = c('amount');
-  const iId = c('id');
-  const iComment = c('comment');
+  const openWs = wb.worksheets.find((w) => /open position/i.test(w.name));
+  // year files written by the import keep the open positions in a separate workbook
+  if (!cashWs && !openWs) throw new Error(`${file}: chybí list "Cash Operations"`);
+  if (cashWs) {
+    const rows = sheetRows(cashWs);
+    const hdr = headerIndex(rows, ['type', 'time', 'amount']);
+    if (!hdr) throw new Error(`${file}: nerozpoznaná hlavička listu Cash Operations`);
+    const c = (name: string) => hdr.cols.get(name) ?? -1;
+    const iType = c('type');
+    const iInstr = c('instrument');
+    const iTicker = c('ticker') >= 0 ? c('ticker') : c('symbol');
+    const iCat = c('category');
+    const iTime = c('time');
+    const iAmount = c('amount');
+    const iId = c('id');
+    const iComment = c('comment');
 
-  let count = 0;
-  for (let ri = hdr.idx + 1; ri < rows.length; ri++) {
-    const r = rows[ri];
-    const type = cellText(r[iType]);
-    if (!type) continue;
-    const rule = TYPE_RULES.find((x) => x.re.test(type));
-    if (!rule) {
-      ledger.warnings.push({ source: file, message: `Neznámý typ operace XTB: "${type}" (řádek ${ri + 1})` });
-      continue;
-    }
-    if (rule.kind === 'IGNORE') continue;
-    count++;
-    const when = cellDate(r[iTime]);
-    if (!when) {
-      ledger.warnings.push({ source: file, message: `Chybí čas operace na řádku ${ri + 1}` });
-      continue;
-    }
-    const dateTime = isoDateTimeUtc(when);
-    const date = dateTime.slice(0, 10);
-    const amount = cellNum(r[iAmount]);
-    const ticker = iTicker >= 0 ? cellText(r[iTicker]) : '';
-    const comment = iComment >= 0 ? cellText(r[iComment]) : '';
-    const opId = iId >= 0 ? cellText(r[iId]) : String(ri);
-    const instrumentId = ticker ? ensureInstrument(ledger, ticker, iInstr >= 0 ? cellText(r[iInstr]) : ticker, iCat >= 0 ? cellText(r[iCat]) : '') : undefined;
-
-    if (rule.kind === 'BUY' || rule.kind === 'SELL') {
-      const m = TRADE_RE.exec(comment);
-      if (!m || !instrumentId) {
-        ledger.warnings.push({ source: file, message: `Nelze rozpoznat obchod XTB: "${comment}" (řádek ${ri + 1})` });
+    let count = 0;
+    for (let ri = hdr.idx + 1; ri < rows.length; ri++) {
+      const r = rows[ri];
+      const type = cellText(r[iType]);
+      if (!type) continue;
+      const rule = TYPE_RULES.find((x) => x.re.test(type));
+      if (!rule) {
+        ledger.warnings.push({ source: file, message: `Neznámý typ operace XTB: "${type}" (řádek ${ri + 1})` });
         continue;
       }
-      const qty = Number(m[4]);
-      const price = Number(m[6]);
-      const inst = ledger.instruments.get(instrumentId)!;
-      ledger.trades.push({
+      if (rule.kind === 'IGNORE') continue;
+      count++;
+      const when = cellDate(r[iTime]);
+      if (!when) {
+        ledger.warnings.push({ source: file, message: `Chybí čas operace na řádku ${ri + 1}` });
+        continue;
+      }
+      const dateTime = isoDateTimeUtc(when);
+      const date = dateTime.slice(0, 10);
+      const amount = cellNum(r[iAmount]);
+      const ticker = iTicker >= 0 ? cellText(r[iTicker]) : '';
+      const comment = iComment >= 0 ? cellText(r[iComment]) : '';
+      const opId = iId >= 0 ? cellText(r[iId]) : String(ri);
+      const instrumentId = ticker ? ensureInstrument(ledger, ticker, iInstr >= 0 ? cellText(r[iInstr]) : ticker, iCat >= 0 ? cellText(r[iCat]) : '') : undefined;
+
+      if (rule.kind === 'BUY' || rule.kind === 'SELL') {
+        const m = TRADE_RE.exec(comment);
+        if (!m || !instrumentId) {
+          ledger.warnings.push({ source: file, message: `Nelze rozpoznat obchod XTB: "${comment}" (řádek ${ri + 1})` });
+          continue;
+        }
+        const qty = Number(m[4]);
+        const price = Number(m[6]);
+        const inst = ledger.instruments.get(instrumentId)!;
+        ledger.trades.push({
+          id: `XTB:${opId}`,
+          broker: BROKER,
+          instrumentId,
+          dateTime,
+          date,
+          quantity: rule.kind === 'BUY' ? qty : -qty,
+          price,
+          currency: inst.currency,
+          amount: qty * price,
+          fees: [],
+          amountCzk: accountCurrency === 'CZK' ? Math.abs(amount) : undefined,
+          orderId: opId,
+        });
+        continue;
+      }
+      const ev: CashEvent = {
         id: `XTB:${opId}`,
         broker: BROKER,
-        instrumentId,
+        kind: rule.kind,
         dateTime,
         date,
-        quantity: rule.kind === 'BUY' ? qty : -qty,
-        price,
-        currency: inst.currency,
-        amount: qty * price,
-        fees: [],
-        amountCzk: accountCurrency === 'CZK' ? Math.abs(amount) : undefined,
-        orderId: opId,
-      });
-      continue;
+        amount,
+        currency: accountCurrency,
+        instrumentId,
+        description: comment || type,
+        feeCategory: rule.kind === 'FEE' ? 'OTHER' : undefined,
+      };
+      ledger.cash.push(ev);
     }
-    const ev: CashEvent = {
-      id: `XTB:${opId}`,
-      broker: BROKER,
-      kind: rule.kind,
-      dateTime,
-      date,
-      amount,
-      currency: accountCurrency,
-      instrumentId,
-      description: comment || type,
-      feeCategory: rule.kind === 'FEE' ? 'OTHER' : undefined,
-    };
-    ledger.cash.push(ev);
+    ledger.sources.push({ broker: BROKER, file, rows: count });
   }
-  ledger.sources.push({ broker: BROKER, file, rows: count });
 
   // Open positions -> current broker valuation (used as fallback price source)
-  const openWs = wb.worksheets.find((w) => /open position/i.test(w.name));
   if (openWs) {
     const orows = sheetRows(openWs);
     let asOf = '';

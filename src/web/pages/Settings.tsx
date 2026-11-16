@@ -5,12 +5,33 @@ import { IconCloudDownload, IconDeviceFloppy, IconUpload } from '@tabler/icons-r
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, useSnapshot, type Settings } from '../api';
+import { api, useSnapshot, type ImportPreview, type InboxFile, type Settings } from '../api';
+import { ImportDialog, MODE_LABEL, type ImportDecision } from '../ImportDialog';
 import { Section } from '../components';
 import { DataGrid } from '../DataGrid';
 import { useSetDemo } from '../demo';
-import { SITUATIONS } from '../format';
+import { date, SITUATIONS } from '../format';
 import { MARKET_STATUS_COLOR, MARKET_STATUS_LABEL, MARKET_STATUS_ORDER, marketStatus, missingMarketData } from '../marketStatus';
+
+const INBOX_STATUS: Record<InboxFile['status'], { label: string; color: string }> = {
+  imported: { label: 'importováno', color: 'teal' },
+  unchanged: { label: 'už uloženo', color: 'gray' },
+  pending: { label: 'čeká na rozhodnutí', color: 'orange' },
+  skipped: { label: 'přeskočeno', color: 'gray' },
+  busy: { label: 'kopíruje se', color: 'blue' },
+  unsupported: { label: 'nepodporovaný formát', color: 'gray' },
+  error: { label: 'chyba', color: 'red' },
+};
+
+const INBOX_ACTION: Record<InboxFile['status'], string> = {
+  imported: 'Importovat znovu',
+  unchanged: 'Importovat znovu',
+  pending: 'Vyřešit',
+  skipped: 'Importovat',
+  busy: '',
+  unsupported: '',
+  error: 'Zkusit znovu',
+};
 
 export function SettingsPage() {
   const qc = useQueryClient();
@@ -18,6 +39,7 @@ export function SettingsPage() {
   const snap = useSnapshot();
   const [st, setSt] = useState<Settings | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [dialog, setDialog] = useState<{ preview: ImportPreview; resolve: (d: ImportDecision | null) => void } | null>(null);
   const setDemo = useSetDemo();
   useEffect(() => {
     if (sq.data) setSt(structuredClone(sq.data.settings));
@@ -35,6 +57,46 @@ export function SettingsPage() {
     const c = structuredClone(st);
     f(c);
     setSt(c);
+  };
+  /** Previews each export; asks only when stored rows would be removed, otherwise merges right away. */
+  const runImports = async (previews: (() => Promise<ImportPreview>)[], fromInbox = false) => {
+    setUploading(true);
+    try {
+      for (const get of previews) {
+        let p: ImportPreview;
+        try {
+          p = await get();
+        } catch (e) {
+          notifications.show({ message: (e as Error).message, color: 'red', autoClose: false });
+          continue;
+        }
+        // an unchanged upload is dropped; an unchanged file from the exports folder is marked as done
+        if (p.units.every((u) => u.plan.unchanged) && !fromInbox) {
+          await api.importCancel(p.id);
+          notifications.show({ message: `${p.fileName}: nic nového – tato data už jsou uložená.`, color: 'blue' });
+          continue;
+        }
+        const decision: ImportDecision | null = p.conflict ? await new Promise<ImportDecision | null>((resolve) => setDialog({ preview: p, resolve })) : { mode: 'merge' };
+        if (!decision) {
+          await api.importCancel(p.id);
+          notifications.show({ message: `${p.fileName}: import zrušen, uložená data se nezměnila.`, color: 'gray' });
+          continue;
+        }
+        try {
+          const r = await api.importCommit(p.id, decision.mode, decision.range);
+          notifications.show({
+            message: `${p.fileName} importován (${MODE_LABEL[decision.mode].label.toLowerCase()}): ${r.units.map((u) => `${u.label} – nové řádky: ${u.added}${u.removed ? `, odebrané: ${u.removed}` : ''}`).join(', ')}`,
+            color: 'teal',
+          });
+          if (!p.conflict) for (const w of p.units.flatMap((u) => u.warnings)) notifications.show({ message: w, color: 'yellow', autoClose: false });
+        } catch (e) {
+          notifications.show({ message: (e as Error).message, color: 'red', autoClose: false });
+        }
+      }
+    } finally {
+      setUploading(false);
+      await qc.invalidateQueries({ queryKey: ['status'] });
+    }
   };
   const instruments = s?.instruments ?? [];
   const missing = missingMarketData(instruments);
@@ -67,7 +129,7 @@ export function SettingsPage() {
           </Text>
           {demo && (
             <Alert color="orange" title="Zobrazena demo data">
-              Výsledky ve všech sekcích pocházejí z ukázkových exportů. Nahrané exporty se uloží do vaší složky a zobrazí se po přepnutí na „Moje exporty“.
+              Výsledky ve všech sekcích pocházejí z ukázkových exportů. Vlastní exporty importujete po přepnutí na „Moje exporty“.
             </Alert>
           )}
         </Stack>
@@ -80,7 +142,7 @@ export function SettingsPage() {
             description={
               demo
                 ? 'V demo režimu se exporty načítají z ukázkových dat aplikace. Složku pro vlastní exporty změníte po přepnutí na „Moje exporty“.'
-                : `Výchozí: ${sq.data.defaultExportsDir}. Načítají se soubory .csv (Degiro Transactions + Account) a .xlsx/.zip (XTB) včetně podsložek.`
+                : `Výchozí: ${sq.data.defaultExportsDir}. Aplikace do této složky nic nezapisuje. Nové exporty v ní při načtení sama naimportuje (rozdělené po letech do svých dat); soubory, které se liší od uložených dat, počkají na vaše rozhodnutí níže.`
             }
             placeholder={sq.data.defaultExportsDir}
             value={st.exportsDir ?? ''}
@@ -89,37 +151,103 @@ export function SettingsPage() {
           />
           <Dropzone
             loading={uploading}
-            onDrop={async (files) => {
-              setUploading(true);
-              try {
-                const r = await api.upload(files);
-                notifications.show({ message: `Nahráno: ${r.saved.map((x) => `${x.file} (${x.kind})`).join(', ')}`, color: 'teal' });
-                await qc.invalidateQueries({ queryKey: ['status'] });
-              } catch (e) {
-                notifications.show({ message: (e as Error).message, color: 'red' });
-              } finally {
-                setUploading(false);
-              }
-            }}
+            disabled={demo}
+            onDrop={(files) =>
+              void runImports(files.map((f) => () => api.importPreview(f)))
+            }
+            data-testid="import-dropzone"
           >
             <Group justify="center" gap="md" mih={90} style={{ pointerEvents: 'none' }}>
               <IconUpload size={32} />
               <div>
-                <Text>Přetáhněte nové exporty sem</Text>
+                <Text>{demo ? 'V demo režimu nelze importovat' : 'Přetáhněte nové exporty sem'}</Text>
                 <Text size="xs" c="dimmed">
-                  Degiro: Transactions.csv a Account.csv · XTB: export .zip nebo .xlsx. Nový export stejného typu nahradí předchozí (starý se přesune do _archiv).
+                  Degiro: Transactions.csv a Account.csv · XTB: export .zip nebo .xlsx. Stačí export za nové období – data se uloží po letech a sloučí s uloženými. Pokud se export v překrývajícím se období od uložených dat liší, zeptám se, co s rozdíly.
                 </Text>
               </div>
             </Group>
           </Dropzone>
-          {s && (
-            <List size="sm">
-              {s.sources.map((x, i) => (
-                <List.Item key={i}>
-                  {x.broker}: {x.file} – {x.rows} řádků
-                </List.Item>
+          {s?.storage ? (
+            <Stack gap={6} data-testid="storage">
+              <Text size="sm" fw={600}>
+                Uložená data
+              </Text>
+              {s.storage.units.length === 0 && (
+                <Text size="sm" c="dimmed">
+                  Zatím nejsou uložená žádná data.
+                </Text>
+              )}
+              {s.storage.units.map((u) => (
+                <div key={u.unit}>
+                  <Text size="sm" fw={500}>
+                    {u.label}: {u.coverage.map((c) => `${date(c.from)} – ${date(c.to)}`).join(', ') || '–'}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Řádky po letech: {u.years.map((y) => `${y.year}: ${y.rows}`).join(' · ')}
+                    {u.openPositionsAsOf && ` · otevřené pozice k ${date(u.openPositionsAsOf)}`}
+                  </Text>
+                  {u.gaps.length > 0 && (
+                    <Text size="xs" c="orange">
+                      Nepokryté období: {u.gaps.map((g) => `${date(g.from)} – ${date(g.to)}`).join(', ')}
+                    </Text>
+                  )}
+                </div>
               ))}
-            </List>
+              <Text size="xs" c="dimmed">
+                Uloženo v {s.storage.storeDir}. Tuto složku nemažte – obsahuje celou importovanou historii, i když staré exporty už smažete.
+              </Text>
+              {s.storage.inbox.length > 0 && (
+                <Stack gap={4} mt="xs" data-testid="inbox">
+                  <Text size="sm" fw={600}>
+                    Soubory ve složce s exporty
+                  </Text>
+                  {s.storage.inbox.filter((f) => f.status !== 'unsupported').map((f) => (
+                    <Group key={f.path} gap="xs" wrap="nowrap">
+                      <Badge size="sm" variant="light" color={INBOX_STATUS[f.status].color}>
+                        {INBOX_STATUS[f.status].label}
+                      </Badge>
+                      <Text size="sm">
+                        {f.path} ({f.kind}){f.message && f.status !== 'pending' ? ` – ${f.message}` : ''}
+                      </Text>
+                      {f.status !== 'busy' && (
+                        <Button
+                          size="compact-xs"
+                          variant={f.status === 'pending' || f.status === 'error' ? 'filled' : 'subtle'}
+                          disabled={uploading}
+                          onClick={() => void runImports([() => api.importInbox(f.path)], true)}
+                        >
+                          {INBOX_ACTION[f.status]}
+                        </Button>
+                      )}
+                    </Group>
+                  ))}
+                  {s.storage.inbox.some((f) => f.status === 'unsupported') && (
+                    <Text size="xs" c="dimmed">
+                      Dalších {s.storage.inbox.filter((f) => f.status === 'unsupported').length} souborů není export Degiro ani XTB – ignorují se.
+                    </Text>
+                  )}
+                </Stack>
+              )}
+            </Stack>
+          ) : (
+            s && (
+              <List size="sm">
+                {s.sources.map((x, i) => (
+                  <List.Item key={i}>
+                    {x.broker}: {x.file} – {x.rows} řádků
+                  </List.Item>
+                ))}
+              </List>
+            )
+          )}
+          {dialog && (
+            <ImportDialog
+              preview={dialog.preview}
+              onDecide={(d) => {
+                setDialog(null);
+                dialog.resolve(d);
+              }}
+            />
           )}
           <Group>
             <Button variant="light" onClick={() => api.reload(false).then(() => qc.invalidateQueries({ queryKey: ['status'] }))}>
