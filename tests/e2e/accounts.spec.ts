@@ -8,7 +8,7 @@ import { trackErrors, waitForSnapshot } from './helpers.js';
 //   Fio 2101112223/2010: opening 10 000, +5 000 from KB, interest +12,34, tax -1,85          -> closing 15 010,49
 //   KB  9876543210/0100: opening 20 000, salary +50 000, rent -15 000, -5 000 to Fio, -8 000 to RB,
 //                        -3 000 to XTB (investment), -700 to an unknown account 5555555/0800, fee -99  -> closing 38 201
-//   RB  1112223335/5500: no balance in the export; +8 000 from KB, card -450,50 and -1 200, ATM -2 000   -> sum of movements 4 349,50
+//   RB  1112223335/5500: no balance in the export; +8 000 from KB, card -450,50, -1 200 and -100 (ALBERT twice), ATM -2 000   -> sum of movements 4 249,50
 const FIO = '2101112223/2010';
 const KB = '9876543210/0100';
 const RB = '1112223335/5500';
@@ -40,7 +40,8 @@ async function accounts(page: Page): Promise<Snap> {
   return r.json();
 }
 const putConfig = (page: Page, config: unknown) => page.request.put('/api/accounts/config', { data: config });
-const EMPTY_CONFIG = { version: 1, accounts: {}, ownAccounts: [] };
+// PUT merges onto the stored config, so categories, rules and overrides are reset explicitly
+const EMPTY_CONFIG = { version: 1, accounts: {}, ownAccounts: [], categories: null, rules: [], overrides: {} };
 
 function fixtureListing(dir = FIXTURES): string[] {
   return readdirSync(dir)
@@ -94,16 +95,16 @@ test.describe('accounts module', () => {
     const by = Object.fromEntries(s.accounts.map((a) => [a.id, a]));
     expect(by[FIO]).toMatchObject({ balance: 15010.49, anchored: true, productInferred: 'savings', txCount: 3 });
     expect(by[KB]).toMatchObject({ balance: 38201, anchored: true, product: 'current', txCount: 7 });
-    expect(by[RB]).toMatchObject({ balance: 4349.5, anchored: false, displayName: 'eKonto TEST', txCount: 4 });
-    expect(s.totals.balanceCzk).toBeCloseTo(15010.49 + 38201 + 4349.5, 2);
+    expect(by[RB]).toMatchObject({ balance: 4249.5, anchored: false, displayName: 'eKonto TEST', txCount: 5 });
+    expect(s.totals.balanceCzk).toBeCloseTo(15010.49 + 38201 + 4249.5, 2);
     expect(s.warnings.filter((w) => w.message.includes('nesedí'))).toEqual([]);
     expect(s.warnings.filter((w) => w.message.includes('neobsahuje zůstatek'))).toHaveLength(1);
 
     const jan = s.months.find((m) => m.month === '2025-01')!;
     expect(jan.income).toBeCloseTo(50012.34, 2);
-    expect(jan.expense).toBeCloseTo(19451.35, 2);
+    expect(jan.expense).toBeCloseTo(19551.35, 2);
     expect(jan.invested).toBeCloseTo(3000, 2);
-    expect(jan.net).toBeCloseTo(30560.99, 2);
+    expect(jan.net).toBeCloseTo(30460.99, 2);
 
     // transfers between the fixture accounts are recognised in both directions; the XTB deposit is an investment
     const transfers = s.txs.filter((t) => t.flow === 'transfer');
@@ -181,7 +182,7 @@ test.describe('accounts module', () => {
     const rb = accountRow(page, RB);
     await expect(rb).toContainText('eKonto TEST');
     await expect(rb).toContainText('Raiffeisenbank');
-    await expect(rb).toContainText(kc(4349.5));
+    await expect(rb).toContainText(kc(4249.5));
     await expect(rb.getByText('odhad', { exact: true })).toBeVisible(); // the RB export carries no balance
 
     // stat cards equal the API values
@@ -210,25 +211,26 @@ test.describe('accounts module', () => {
     await page.goto('/#/ucty');
     await accountRow(page, RB).getByRole('link', { name: 'eKonto TEST' }).click();
     await expect(page).toHaveURL(/#\/ucty\/transakce\?ucet=1112223335%2F5500$/);
-    await expect(statCard(page, 'Pohybů')).toContainText('4');
-    await expect(page.getByText(/^4 záznamů/)).toBeVisible();
+    await expect(statCard(page, 'Pohybů')).toContainText('5');
+    await expect(page.getByText(/^5 záznamů/)).toBeVisible();
     await expect(page.getByTestId('filter-accounts')).toBeVisible();
     // RB: income 0 (the only credit is a transfer), expenses 450,50 + 1 200 + 2 000
     await expect(statCard(page, 'Příjmy')).toContainText(kc(0));
-    await expect(statCard(page, 'Výdaje')).toContainText(kc(3650.5));
+    await expect(statCard(page, 'Výdaje')).toContainText(kc(3750.5));
     const body = page.locator('main tbody');
     await expect(body).toContainText('ALBERT TEST');
     await expect(body).toContainText('SHELL TEST');
     await expect(body).toContainText('Převod mezi účty');
 
-    // clear the account filter: everything (3 + 7 + 4 movements)
+    // clear the account filter: everything (3 + 7 + 5 movements)
     await page.goto('/#/ucty/transakce');
-    await expect(statCard(page, 'Pohybů')).toContainText('14');
+    await expect(statCard(page, 'Pohybů')).toContainText('15');
     await expect(statCard(page, 'Příjmy')).toContainText(kc(50012.34));
-    await expect(statCard(page, 'Výdaje')).toContainText(kc(19451.35));
+    await expect(statCard(page, 'Výdaje')).toContainText(kc(19551.35));
     await expect(statCard(page, 'Na investice')).toContainText(kc(3000));
-    await expect(body.getByText('Převod mezi účty', { exact: true })).toHaveCount(4);
-    await expect(body.getByText('Investice', { exact: true })).toHaveCount(1);
+    // the flow label and the category button of every transfer both read "Převod mezi účty"
+    await expect(body.getByText('Převod mezi účty', { exact: true })).toHaveCount(8);
+    await expect(body.getByText('Investice', { exact: true })).toHaveCount(2);
 
     // bank filter
     await page.getByRole('combobox', { name: 'Banky' }).click();
@@ -246,10 +248,10 @@ test.describe('accounts module', () => {
     await page.goto('/#/ucty');
     await page.goto('/#/ucty/transakce');
     await page.getByLabel('Hledat v tabulce').fill('albert');
-    await expect(page.getByText(/1 z 14 záznamů/)).toBeVisible();
-    await expect(statCard(page, 'Pohybů')).toContainText('14');
+    await expect(page.getByText(/2 z 15 záznamů/)).toBeVisible();
+    await expect(statCard(page, 'Pohybů')).toContainText('15');
     await page.getByLabel('Hledat v tabulce').fill('XTB');
-    await expect(page.getByText(/1 z 14 záznamů/)).toBeVisible();
+    await expect(page.getByText(/1 z 15 záznamů/)).toBeVisible();
     await page.getByLabel('Hledat v tabulce').fill('nothing like this');
     await expect(page.getByText('Žádné záznamy')).toBeVisible();
   });
@@ -298,17 +300,17 @@ test.describe('accounts module', () => {
 
     const s = await accounts(page);
     expect(s.accounts.find((a) => a.id === FIO)!.hidden).toBe(true);
-    expect(s.totals.balanceCzk).toBeCloseTo(38201 + 4349.5, 2);
+    expect(s.totals.balanceCzk).toBeCloseTo(38201 + 4249.5, 2);
     await page.goto('/#/ucty');
     await expect(accountRow(page, FIO)).toContainText('skrytý');
-    await expect(statCard(page, 'Zůstatek na účtech')).toContainText(kc(38201 + 4349.5));
+    await expect(statCard(page, 'Zůstatek na účtech')).toContainText(kc(38201 + 4249.5));
     await expect(statCard(page, 'Zůstatek na účtech')).toContainText('2 účtů');
     await page.goto('/#/ucty/transakce');
-    await expect(statCard(page, 'Pohybů')).toContainText('14');
+    await expect(statCard(page, 'Pohybů')).toContainText('15');
     // the Fio interest (+12,34) no longer counts as income
     await expect(statCard(page, 'Příjmy')).toContainText(kc(50000));
     await page.goto('/#/');
-    await expect(statCard(page, 'Na účtech')).toContainText(kc(38201 + 4349.5));
+    await expect(statCard(page, 'Na účtech')).toContainText(kc(38201 + 4249.5));
   });
 
   test('settings: an investment account turns an expense into an investment; an invalid number is refused', async ({ page }) => {
@@ -332,7 +334,7 @@ test.describe('accounts module', () => {
     expect(s.txs.find((t) => t.amount === -700)!.flow).toBe('investment');
     const jan = s.months.find((m) => m.month === '2025-01')!;
     expect(jan.invested).toBeCloseTo(3700, 2);
-    expect(jan.expense).toBeCloseTo(19451.35 - 700, 2);
+    expect(jan.expense).toBeCloseTo(19551.35 - 700, 2);
 
     await page.goto('/#/ucty/transakce');
     await expect(statCard(page, 'Na investice')).toContainText(kc(3700));

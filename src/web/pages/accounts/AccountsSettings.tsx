@@ -42,7 +42,8 @@ export function AccountsSettings() {
     }
     setSaving(true);
     try {
-      const snap = await api.saveAccountsConfig(cfg);
+      // only this section's part: the server keeps categories, rules and assignments
+      const snap = await api.saveAccountsConfig({ accounts: cfg.accounts, ownAccounts: cfg.ownAccounts });
       setDirty(false);
       qc.setQueryData(['accounts'], snap);
       notifications.show({ message: 'Nastavení účtů uloženo', color: 'teal' });

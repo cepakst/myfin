@@ -3,7 +3,7 @@
  * import scan, see engine.ts); the snapshot itself is cheap and is recomputed on its own when the
  * accounts configuration changes. No network access.
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { sanitizeAccountsConfig, summarizeAccounts, type AccountsConfig, type AccountsSummary, type CzkConverter } from '../core/accounts/analytics.js';
 import type { BankLedger } from '../core/accounts/types.js';
 import { todayIso } from '../core/util.js';
@@ -29,19 +29,27 @@ export function accountsConfigFile(demo: boolean): string {
   return demo ? DEMO_ACCOUNTS_FILE : ACCOUNTS_FILE;
 }
 
-export function loadAccountsConfig(demo: boolean): AccountsConfig {
+/**
+ * Reads the config. An unreadable file yields the defaults, unless `strict` is set: then it throws,
+ * so that a partial update (categorize) never saves the defaults over the user's damaged file.
+ */
+export function loadAccountsConfig(demo: boolean, strict = false): AccountsConfig {
   const file = accountsConfigFile(demo);
   try {
     if (existsSync(file)) return sanitizeAccountsConfig(JSON.parse(readFileSync(file, 'utf-8')));
-  } catch {
-    /* fall through to defaults */
+  } catch (e) {
+    if (strict) throw new Error(`Soubor s nastavením účtů nelze přečíst (${file}): ${(e as Error).message}`);
   }
   return sanitizeAccountsConfig(undefined);
 }
 
+/** Writes through a temporary file and a rename, so an interrupted write never truncates the config. */
 export function saveAccountsConfig(demo: boolean, config: AccountsConfig): void {
   ensureDir(DATA_DIR);
-  writeFileSync(accountsConfigFile(demo), JSON.stringify(config, null, 2));
+  const file = accountsConfigFile(demo);
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(config, null, 2));
+  renameSync(tmp, file);
 }
 
 /** Computes the accounts snapshot from the bank ledger read by the last engine run. */

@@ -32,6 +32,19 @@ export function HomePage({ s, a }: { s?: Snapshot; a?: AccountsSnapshot }) {
 
   const empty = !hasAccounts && !hasInvestments && !!s && !!a;
 
+  // biggest spending categories of the last 12 months (visible accounts)
+  const from12 = a?.months.slice(-12)[0]?.month ?? ''; // the same 12 months as the account totals
+  const hiddenAcc = new Set(a?.accounts.filter((x) => x.hidden).map((x) => x.id) ?? []);
+  const catSums = new Map<string, number>();
+  for (const t of a?.txs ?? []) {
+    if (t.flow !== 'expense' || !t.category || hiddenAcc.has(t.accountId) || t.date.slice(0, 7) < from12) continue;
+    catSums.set(t.category, (catSums.get(t.category) ?? 0) - (t.amountCzk ?? 0));
+  }
+  const topCats = [...catSums]
+    .map(([id, sum]) => ({ id, sum, name: a?.categories.find((c) => c.id === id)?.name ?? id }))
+    .sort((x, y) => y.sum - x.sum)
+    .slice(0, 3);
+
   return (
     <Stack>
       {empty && !s.demo && (
@@ -114,6 +127,19 @@ export function HomePage({ s, a }: { s?: Snapshot; a?: AccountsSnapshot }) {
               <Text size="sm">
                 Míra úspor: <b>{pct(a.totals.savingsRate12m)}</b> · investováno <b>{czk(a.totals.invested12m)}</b>
               </Text>
+              {topCats.length > 0 && (
+                <Text size="sm">
+                  Největší výdaje za 12 měsíců: {topCats.map((c, i) => (
+                    <span key={c.id}>
+                      {i > 0 && ', '}
+                      {c.name} <b>{czk(c.sum)}</b>
+                    </span>
+                  ))}{' '}
+                  <Anchor component={Link} to="/ucty/kategorie" size="sm">
+                    (vše)
+                  </Anchor>
+                </Text>
+              )}
             </Stack>
           )}
         </Section>

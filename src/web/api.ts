@@ -6,6 +6,7 @@ import type { DateRange, ImportMode } from '../core/exportStore';
 import type { CommitResult, ImportPreview, InboxFile } from '../server/importer';
 import type { AccountsSnapshot } from '../server/accountsEngine';
 import type { AccountsConfig } from '../core/accounts/analytics';
+import type { CategoryRule } from '../core/accounts/categories';
 
 export type { Snapshot, InstrumentDetail, Settings, ImportPreview, CommitResult, InboxFile, AccountsSnapshot, AccountsConfig };
 
@@ -44,7 +45,9 @@ export const api = {
   importCommit: (id: string, mode: ImportMode, range?: DateRange) => post<CommitResult>('/api/import/commit', { id, mode, range }),
   importCancel: (id: string) => post<{ ok: boolean }>('/api/import/cancel', { id }),
   accounts: () => json<AccountsSnapshot>('/api/accounts'),
-  saveAccountsConfig: (c: AccountsConfig) => json<AccountsSnapshot>('/api/accounts/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) }),
+  categorize: (assign: Record<string, string | null>, rules: CategoryRule[] = []) => post<AccountsSnapshot>('/api/accounts/categorize', { assign, rules }),
+  /** saves the parts sent; the server keeps the others (`categories: null` = default categories) */
+  saveAccountsConfig: (c: Partial<Omit<AccountsConfig, 'categories'>> & { categories?: AccountsConfig['categories'] | null }) => json<AccountsSnapshot>('/api/accounts/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...c, version: 1 }) }),
 };
 
 function post<T>(url: string, body: unknown): Promise<T> {
