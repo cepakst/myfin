@@ -28,11 +28,13 @@ export function getPath(r: unknown, path: string): unknown {
 }
 
 const collator = new Intl.Collator('cs', { numeric: true, sensitivity: 'base' });
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/;
 
 /** Ascending comparison; null/undefined/NaN always sort last regardless of direction (handled in sortRows). */
 export function compareValues(x: unknown, y: unknown): number {
   if (typeof x === 'number' && typeof y === 'number') return x - y;
   if (typeof x === 'boolean' && typeof y === 'boolean') return Number(x) - Number(y);
+  if (typeof x === 'string' && typeof y === 'string' && ISO_DATE.test(x) && ISO_DATE.test(y)) return x < y ? -1 : x > y ? 1 : 0;
   return collator.compare(String(x), String(y));
 }
 

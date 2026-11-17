@@ -1,5 +1,5 @@
-import { Badge, Group, MultiSelect, SimpleGrid, Stack, Text, Tooltip } from '@mantine/core';
-import { useMemo, useState } from 'react';
+import { Badge, Center, Group, Loader, MultiSelect, Select, SimpleGrid, Stack, Text, Tooltip } from '@mantine/core';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { AccountsSnapshot } from '../../api';
 import { Stat } from '../../components';
@@ -7,7 +7,11 @@ import { DataGrid } from '../../DataGrid';
 import { czk, date, money, signColor } from '../../format';
 import { PRODUCT_LABEL, type ProductType } from '../../../core/accounts/types';
 import { AccountsEmpty } from './AccountsOverview';
-import { categoryName, categoryOptions, groupSimilar, TxCategorySelect, UNCAT_LABEL, useTxPicker } from './categoryUi';
+import { categoryName, categoryOptions, groupSimilar, similarKey, TxCategorySelect, UNCAT_LABEL, useTxPicker } from './categoryUi';
+import { DEFAULT_PERIOD, monthLabel, periodMonths, periodOptions } from './period';
+
+/** rows rendered at once: thousands of rows with category buttons made the page slow */
+const PAGE_SIZE = 100;
 
 type Tx = AccountsSnapshot['txs'][number];
 
@@ -36,6 +40,14 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
   const kat = params.getAll('kategorie').join('|');
   const catFilter = useMemo(() => (kat ? kat.split('|').map((c) => (c === '-' ? '' : c)) : []), [kat]);
   const month = params.get('mesic') ?? '';
+  // a month picked elsewhere (link from Výdaje a příjmy) is narrower than any period
+  // an unknown period (old bookmark, year without data) falls back to the default
+  const wanted = params.get('obdobi') ?? DEFAULT_PERIOD;
+  const period = periodOptions(a).some((o) => o.value === wanted) ? wanted : DEFAULT_PERIOD;
+  // "all" has no date limit (transactions dated after today included)
+  const months = useMemo(() => (period === 'all' ? null : new Set(periodMonths(a, period))), [a, period]);
+  // one counterparty in one direction (link from Zařadit)
+  const cp = params.get('protistrana') ?? '';
   const [banks, setBanks] = useState<string[]>([]);
   const [products, setProducts] = useState<string[]>([]);
   const accById = useMemo(() => new Map(a.accounts.map((x) => [x.id, x])), [a.accounts]);
@@ -49,11 +61,21 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
         .filter((t) => !banks.length || banks.includes(t.bank))
         .filter((t) => !products.length || products.includes(accById.get(t.accountId)?.product ?? ''))
         .filter((t) => !catFilter.length || catFilter.includes(t.category))
-        .filter((t) => !month || t.date.startsWith(month))
+        .filter((t) => (month ? t.date.startsWith(month) : !months || months.has(t.date.slice(0, 7))))
+        .filter((t) => !cp || similarKey(t) === cp)
         .map((t) => ({ ...t, counterparty: counterparty(t), description: description(t), flowLabel: FLOW_LABEL[t.flow], categoryName: categoryName(a.categories, t.category) })),
-    [a.txs, a.categories, accountFilter, banks, products, accById, catFilter, month],
+    [a.txs, a.categories, accountFilter, banks, products, accById, catFilter, month, months, cp],
   );
+  // the table renders in the background: a spinner on entry, an overlay while filters change
+  const shownRows = useDeferredValue<typeof rows | null>(rows, null);
+  const cpLabel = useMemo(() => (cp ? a.txs.find((t) => similarKey(t) === cp)?.cpLabel : undefined), [a.txs, cp]);
   if (a.accounts.length === 0) return <AccountsEmpty />;
+  const setParam = (key: string, value: string | null) => {
+    const p = new URLSearchParams(params);
+    p.delete(key);
+    if (value !== null) p.set(key, value);
+    setParams(p, { replace: true });
+  };
 
   // like the overview: hidden accounts stay in the list but not in the totals
   const sumBy = (f: Tx['flow']) => rows.filter((r) => r.flow === f && !accById.get(r.accountId)?.hidden).reduce((s, r) => s + (r.amountCzk ?? 0), 0);
@@ -112,13 +134,24 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
           w={260}
           data-testid="filter-categories"
         />
-        {month && (
-          <Badge size="lg" variant="light" style={{ cursor: 'pointer' }} onClick={() => {
-            const p = new URLSearchParams(params);
-            p.delete('mesic');
-            setParams(p, { replace: true });
-          }}>
-            {month} ✕
+        {month ? (
+          <Badge size="lg" variant="light" style={{ cursor: 'pointer' }} onClick={() => setParam('mesic', null)} title="Zrušit výběr měsíce">
+            {monthLabel(month)} ✕
+          </Badge>
+        ) : (
+          <Select
+            label="Období"
+            w={220}
+            data={periodOptions(a)}
+            value={period}
+            onChange={(v) => v && setParam('obdobi', v === DEFAULT_PERIOD ? null : v)}
+            allowDeselect={false}
+            data-testid="filter-period"
+          />
+        )}
+        {cp && (
+          <Badge size="lg" variant="light" color="grape" style={{ cursor: 'pointer' }} onClick={() => setParam('protistrana', null)} title="Zrušit výběr protistrany" data-testid="filter-counterparty">
+            {cp.startsWith('in|') ? 'Od' : 'Pro'}: {cpLabel ?? '?'} ✕
           </Badge>
         )}
       </Group>
@@ -128,9 +161,18 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
         <Stat label="Výdaje" value={czk(-sumBy('expense'))} color="red" hint={FLOW_HINT.expense} />
         <Stat label="Na investice" value={czk(-sumBy('investment'))} hint={FLOW_HINT.investment} />
       </SimpleGrid>
+      {shownRows === null ? (
+        <Center h={240}>
+          <Loader data-testid="transactions-loading" />
+        </Center>
+      ) : (
       <DataGrid
         label="Transakce"
-        records={rows}
+        records={shownRows}
+        pageSize={PAGE_SIZE}
+        // new filters start on page 1; a category change (new snapshot) keeps the page
+        pageResetKey={[ucet, kat, month, period, cp, banks.join(','), products.join(',')].join('|')}
+        fetching={shownRows !== rows}
         idAccessor="key"
         defaultSort={{ column: 'date', direction: 'desc' }}
         maxHeight={640}
@@ -207,6 +249,7 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
           },
         ]}
       />
+      )}
     </Stack>
   );
 }
