@@ -6,27 +6,19 @@ import { Chart, Section, Stat, tooltipCzk } from '../../components';
 import { czk, pct } from '../../format';
 import { AccountsEmpty } from './AccountsOverview';
 import { categoryColor, categoryName } from './categoryUi';
+import { DEFAULT_PERIOD, monthLabel, periodMonths, periodOptions as periodChoices } from './period';
 
 type Tx = AccountsSnapshot['txs'][number];
 type Kind = 'expense' | 'income';
-
-const monthLabel = (m: string) => `${Number(m.slice(5, 7))}/${m.slice(0, 4)}`;
 
 /** Spending and income by category for a period, with the monthly trend and top counterparties. */
 export function AccountsCategoriesPage({ a }: { a: AccountsSnapshot }) {
   const navigate = useNavigate();
   const [kind, setKind] = useState<Kind>('expense');
-  const lastMonth = a.months.filter((m) => m.month <= a.today.slice(0, 7)).at(-1)?.month ?? a.today.slice(0, 7);
-  const years = [...new Set(a.months.map((m) => m.month.slice(0, 4)))].sort().reverse();
-  const [period, setPeriod] = useState('12m');
+  const [period, setPeriod] = useState(DEFAULT_PERIOD);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const months = useMemo(() => {
-    const all = a.months.map((m) => m.month).filter((m) => m <= lastMonth);
-    if (period === '12m') return all.slice(-12);
-    if (period === 'all') return all;
-    return all.filter((m) => m.startsWith(period));
-  }, [a.months, period, lastMonth]);
+  const months = useMemo(() => periodMonths(a, period), [a, period]);
 
   const hidden = useMemo(() => new Set(a.accounts.filter((x) => x.hidden).map((x) => x.id)), [a.accounts]);
   const txs = useMemo(() => {
@@ -65,12 +57,9 @@ export function AccountsCategoriesPage({ a }: { a: AccountsSnapshot }) {
     for (const t of txs) if (t.category === r.id) data[monthIdx.get(t.date.slice(0, 7))!] += val(t);
     return { name: r.name, type: 'bar' as const, stack: 'total', data: data.map((v) => Math.round(v)), itemStyle: { color: categoryColor(a.categories, r.id) } };
   });
-  const periodOptions = [
-    { value: '12m', label: 'Posledních 12 měsíců' },
-    ...years.map((y) => ({ value: y, label: `Rok ${y}` })),
-    { value: 'all', label: 'Celá historie' },
-  ];
-  const txLink = (cat: string, month?: string) => `/ucty/transakce?kategorie=${encodeURIComponent(cat || '-')}${month ? `&mesic=${month}` : ''}`;
+  const periodOptions = periodChoices(a);
+  // the transactions page shows the same period (or the month clicked in the chart)
+  const txLink = (cat: string, month?: string) => `/ucty/transakce?kategorie=${encodeURIComponent(cat || '-')}${month ? `&mesic=${month}` : period === DEFAULT_PERIOD ? '' : `&obdobi=${period}`}`;
   const catByName = new Map(rows.map((r) => [r.name, r.id]));
 
   return (

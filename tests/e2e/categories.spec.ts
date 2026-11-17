@@ -219,7 +219,7 @@ test.describe('accounts: categorisation', () => {
 
   test('Transakce: changing one transaction asks "Jen tuto" vs all similar', async ({ page }) => {
     await accounts(page);
-    await page.goto('/#/ucty/transakce?kategorie=groceries');
+    await page.goto('/#/ucty/transakce?obdobi=all&kategorie=groceries');
     await expect(rows(page)).toHaveCount(2);
     await expect(rows(page).first().getByTestId('tx-category')).toContainText('Potraviny');
     // the source icon explains the category in its title
@@ -243,7 +243,7 @@ test.describe('accounts: categorisation', () => {
     expect(s.txs.filter((t) => t.cpLabel === 'ALBERT TEST').every((t) => t.category === 'groceries')).toBe(true);
 
     // all similar + rule
-    await page.goto('/#/ucty/transakce?kategorie=groceries');
+    await page.goto('/#/ucty/transakce?obdobi=all&kategorie=groceries');
     await expect(rows(page)).toHaveCount(2);
     await rows(page).first().getByTestId('tx-category').click();
     await page.getByRole('option', { name: 'Dárky', exact: true }).click();
@@ -259,7 +259,7 @@ test.describe('accounts: categorisation', () => {
 
   test('Transakce: a payment of a counterparty with a single transaction is assigned without the question', async ({ page }) => {
     await accounts(page);
-    await page.goto('/#/ucty/transakce?kategorie=-');
+    await page.goto('/#/ucty/transakce?obdobi=all&kategorie=-');
     await expect(rows(page)).toHaveCount(1);
     await rows(page).first().getByTestId('tx-category').click();
     await page.getByRole('option', { name: 'Dárky', exact: true }).click();
@@ -272,24 +272,28 @@ test.describe('accounts: categorisation', () => {
 
   test('Transakce: the category filter and the month parameter in the URL', async ({ page }) => {
     await accounts(page);
-    await page.goto('/#/ucty/transakce?kategorie=-');
+    await page.goto('/#/ucty/transakce?obdobi=all&kategorie=-');
     await expect(rows(page)).toHaveCount(1);
     await expect(rows(page).first()).toContainText('ZKUSEBNI SPOLECNOST');
     await expect(rows(page).first().getByTestId('tx-category')).toContainText('Nezařazeno');
     await expect(page.getByTestId('filter-categories')).toBeVisible();
 
-    await page.goto('/#/ucty/transakce?kategorie=cash&kategorie=transport');
+    await page.goto('/#/ucty/transakce?obdobi=all&kategorie=cash&kategorie=transport');
     await expect(rows(page)).toHaveCount(2);
-    await page.goto('/#/ucty/transakce?kategorie=transfer');
+    await page.goto('/#/ucty/transakce?obdobi=all&kategorie=transfer');
     await expect(rows(page)).toHaveCount(4);
 
     await page.goto('/#/ucty/transakce?mesic=2025-01');
     await expect(rows(page)).toHaveCount(15);
-    await expect(page.getByText('2025-01 ✕')).toBeVisible();
+    await expect(page.getByText('1/2025 ✕')).toBeVisible();
     await page.goto('/#/ucty/transakce?mesic=2025-02');
     await expect(page.getByText('Žádné záznamy')).toBeVisible();
-    await page.getByText('2025-02 ✕').click();
+    await page.getByText('2/2025 ✕').click();
     await expect(page).toHaveURL(/#\/ucty\/transakce$/);
+    // back on the default period (last 12 months), which the 2025 fixtures are older than
+    await expect(page.getByTestId('filter-period')).toHaveValue('Posledních 12 měsíců');
+    await expect(page.getByText('Žádné záznamy')).toBeVisible();
+    await page.goto('/#/ucty/transakce?obdobi=all');
     await expect(rows(page)).toHaveCount(15);
 
     // the filter control writes to the URL
@@ -331,7 +335,8 @@ test.describe('accounts: categorisation', () => {
 
     // a link in the table goes to the transactions of that category
     await page.getByRole('link', { name: 'Mzda' }).click();
-    await expect(page).toHaveURL(/#\/ucty\/transakce\?kategorie=salary$/);
+    // the transactions page keeps the period chosen here
+    await expect(page).toHaveURL(/#\/ucty\/transakce\?kategorie=salary&obdobi=2025$/);
     await expect(rows(page)).toHaveCount(1);
   });
 

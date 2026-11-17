@@ -212,6 +212,11 @@ test.describe('accounts module', () => {
     await page.goto('/#/ucty');
     await accountRow(page, RB).getByRole('link', { name: 'eKonto TEST' }).click();
     await expect(page).toHaveURL(/#\/ucty\/transakce\?ucet=1112223335%2F5500$/);
+    // the default period is the last 12 months; the fixtures are older
+    await expect(page.getByTestId('filter-period')).toHaveValue('Posledních 12 měsíců');
+    await page.getByTestId('filter-period').click();
+    await page.getByRole('option', { name: 'Celá historie' }).click();
+    await expect(page).toHaveURL(/obdobi=all/);
     await expect(statCard(page, 'Pohybů')).toContainText('5');
     await expect(page.getByText(/^5 záznamů/)).toBeVisible();
     await expect(page.getByTestId('filter-accounts')).toBeVisible();
@@ -224,7 +229,7 @@ test.describe('accounts module', () => {
     await expect(body).toContainText('Převod mezi účty');
 
     // clear the account filter: everything (3 + 7 + 5 movements)
-    await page.goto('/#/ucty/transakce');
+    await page.goto('/#/ucty/transakce?obdobi=all');
     await expect(statCard(page, 'Pohybů')).toContainText('15');
     await expect(statCard(page, 'Příjmy')).toContainText(kc(50012.34));
     await expect(statCard(page, 'Výdaje')).toContainText(kc(19551.35));
@@ -247,7 +252,7 @@ test.describe('accounts module', () => {
 
     // search (the stat cards ignore it, the record counter shows it); a route change resets the filters
     await page.goto('/#/ucty');
-    await page.goto('/#/ucty/transakce');
+    await page.goto('/#/ucty/transakce?obdobi=all');
     await page.getByLabel('Hledat v tabulce').fill('albert');
     await expect(page.getByText(/2 z 15 záznamů/)).toBeVisible();
     await expect(statCard(page, 'Pohybů')).toContainText('15');
@@ -306,7 +311,7 @@ test.describe('accounts module', () => {
     await expect(accountRow(page, FIO)).toContainText('skrytý');
     await expect(statCard(page, 'Zůstatek na účtech')).toContainText(kc(38201 + 4249.5));
     await expect(statCard(page, 'Zůstatek na účtech')).toContainText('2 účtů');
-    await page.goto('/#/ucty/transakce');
+    await page.goto('/#/ucty/transakce?obdobi=all');
     await expect(statCard(page, 'Pohybů')).toContainText('15');
     // the Fio interest (+12,34) no longer counts as income
     await expect(statCard(page, 'Příjmy')).toContainText(kc(50000));
@@ -337,7 +342,7 @@ test.describe('accounts module', () => {
     expect(jan.invested).toBeCloseTo(3700, 2);
     expect(jan.expense).toBeCloseTo(19551.35 - 700, 2);
 
-    await page.goto('/#/ucty/transakce');
+    await page.goto('/#/ucty/transakce?obdobi=all');
     await expect(statCard(page, 'Na investice')).toContainText(kc(3700));
     // switching the account to "own" makes it a transfer instead
     await page.goto('/#/nastaveni');

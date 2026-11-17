@@ -21,6 +21,9 @@ interface Group {
   suggested?: string;
 }
 
+/** Transactions of the counterparty (in the same direction) on the Transakce page */
+const groupLink = (g: Group, uncategorized = false) => `/ucty/transakce?protistrana=${encodeURIComponent(g.key)}${uncategorized ? '&kategorie=-' : ''}&obdobi=all`;
+
 function toGroups(txs: Tx[]): Group[] {
   return [...groupSimilar(txs)]
     .map(([key, list]) => ({
@@ -111,9 +114,9 @@ export function AccountsCategorizePage({ a }: { a: AccountsSnapshot }) {
               {suggestions.map((g) => (
                 <Table.Tr key={g.key}>
                   <Table.Td>
-                    <Text size="sm" fw={500}>
+                    <Anchor component={Link} to={groupLink(g)} size="sm" fw={500} title="Zobrazit transakce protistrany">
                       {g.label}
-                    </Text>
+                    </Anchor>
                     <Text size="xs" c="dimmed">
                       {g.txs.length}× · {czk(g.sum)}
                     </Text>
@@ -139,7 +142,7 @@ export function AccountsCategorizePage({ a }: { a: AccountsSnapshot }) {
         title="Nezařazené podle protistrany"
         hint="Seřazeno podle součtu částek – nahoře jsou protistrany, jejichž zařazení nejvíc zpřesní přehled výdajů. Zvolením kategorie se zařadí všechny transakce protistrany a vznikne pravidlo pro budoucí transakce."
         right={
-          <Anchor component={Link} to="/ucty/transakce?kategorie=-" size="sm">
+          <Anchor component={Link} to="/ucty/transakce?kategorie=-&obdobi=all" size="sm">
             Zařadit jednotlivě →
           </Anchor>
         }
@@ -164,9 +167,9 @@ export function AccountsCategorizePage({ a }: { a: AccountsSnapshot }) {
                 {open.slice(0, shown).map((g) => (
                   <Table.Tr key={g.key}>
                     <Table.Td>
-                      <Text size="sm" fw={500}>
+                      <Anchor component={Link} to={groupLink(g, true)} size="sm" fw={500} title="Zobrazit nezařazené transakce protistrany" data-testid="group-link">
                         {g.label}
-                      </Text>
+                      </Anchor>
                       <Text size="xs" c="dimmed">
                         {g.accounts.join(', ')} · naposledy {date(g.last)}
                       </Text>
