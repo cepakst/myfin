@@ -2,12 +2,13 @@ import { Alert, Anchor, Badge, Center, Group, Loader, SimpleGrid, Stack, Tabs, T
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { api, type Snapshot } from '../api';
-import { Chart, Section, Stat } from '../components';
+import { Section, Stat } from '../components';
 import { DataGrid } from '../DataGrid';
 import { czk, date, money, num, signColor } from '../format';
 import { LotsTable, priceSourceText } from './Portfolio';
 import { missingMarketData } from '../marketStatus';
 import { G } from '../glossary';
+import { PriceChart } from './PriceChart';
 
 export function InstrumentPage({ s }: { s: Snapshot }) {
   const id = decodeURIComponent(useParams().id ?? '');
@@ -18,8 +19,6 @@ export function InstrumentPage({ s }: { s: Snapshot }) {
   if (!q.data || !inst) return <Text>Instrument nenalezen. <Anchor component={Link} to="/portfolio">Zpět</Anchor></Text>;
   const d = q.data;
   const cur = d.currency ?? inst.currency;
-  const buys = d.trades.filter((t) => t.quantity > 0 && t.currency === cur);
-  const sells = d.trades.filter((t) => t.quantity < 0 && t.currency === cur);
   const realized = d.realizations.reduce((a, r) => a + r.gainCzk, 0);
   const divs = d.dividends.reduce((a, p) => a + p.netCzkDaily, 0);
 
@@ -57,22 +56,7 @@ export function InstrumentPage({ s }: { s: Snapshot }) {
             Pro tento instrument nejsou tržní data. Symbol lze doplnit v Nastavení.
           </Text>
         ) : (
-          <Chart
-            height={380}
-            option={{
-              tooltip: { trigger: 'axis' },
-              legend: {},
-              grid: { left: 60, right: 20, top: 40, bottom: 60 },
-              xAxis: { type: 'time' },
-              yAxis: { type: 'value', scale: true },
-              dataZoom: [{ type: 'inside' }, { type: 'slider' }],
-              series: [
-                { name: 'Cena', type: 'line', showSymbol: false, sampling: 'lttb', data: d.prices.map((p) => [p.date, Number(p.close.toFixed(4))]) },
-                { name: 'Nákup', type: 'scatter', symbol: 'triangle', symbolSize: 11, itemStyle: { color: '#12b886' }, data: buys.map((t) => [t.date, t.price, t.quantity]) },
-                { name: 'Prodej', type: 'scatter', symbol: 'triangle', symbolRotate: 180, symbolSize: 11, itemStyle: { color: '#fa5252' }, data: sells.map((t) => [t.date, t.price, t.quantity]) },
-              ],
-            }}
-          />
+          <PriceChart d={d} cur={cur} />
         )}
       </Section>
       <Tabs defaultValue="lots">

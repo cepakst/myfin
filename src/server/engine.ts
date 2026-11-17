@@ -394,6 +394,8 @@ export interface InstrumentDetail {
   instrument: Instrument;
   prices: { date: string; close: number }[];
   currency: string | null;
+  /** splits from the market data (prices above are actual, not split-adjusted) */
+  splits: { date: string; ratio: number }[];
   trades: Trade[];
   dividends: DividendPayment[];
   lots: LotView[];
@@ -411,6 +413,7 @@ export function instrumentDetail(id: string): InstrumentDetail | null {
     instrument: inst,
     prices: s ? s.dates.map((d, i) => ({ date: d, close: s.closes[i] })) : [],
     currency: s?.currency ?? null,
+    splits: s?.splits ?? [],
     trades: ledger.trades.filter((t) => t.instrumentId === id),
     dividends: snap.dividends.filter((d) => d.instrumentId === id),
     lots: snap.lots.filter((l) => l.instrumentId === id),
