@@ -7,6 +7,7 @@ import { DataGrid } from '../../DataGrid';
 import { czk, date, money, signColor } from '../../format';
 import { PRODUCT_LABEL, type ProductType } from '../../../core/accounts/types';
 import { AccountsEmpty } from './AccountsOverview';
+import { categoryName, categoryOptions, groupSimilar, TxCategorySelect, UNCAT_LABEL, useTxPicker } from './categoryUi';
 
 type Tx = AccountsSnapshot['txs'][number];
 
@@ -32,9 +33,14 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
   const [params, setParams] = useSearchParams();
   const ucet = params.getAll('ucet').join('|');
   const accountFilter = useMemo(() => (ucet ? ucet.split('|') : []), [ucet]);
+  const kat = params.getAll('kategorie').join('|');
+  const catFilter = useMemo(() => (kat ? kat.split('|').map((c) => (c === '-' ? '' : c)) : []), [kat]);
+  const month = params.get('mesic') ?? '';
   const [banks, setBanks] = useState<string[]>([]);
   const [products, setProducts] = useState<string[]>([]);
   const accById = useMemo(() => new Map(a.accounts.map((x) => [x.id, x])), [a.accounts]);
+  const groups = useMemo(() => groupSimilar(a.txs), [a.txs]);
+  const picker = useTxPicker(a, groups);
 
   const rows = useMemo(
     () =>
@@ -42,8 +48,10 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
         .filter((t) => !accountFilter.length || accountFilter.includes(t.accountId))
         .filter((t) => !banks.length || banks.includes(t.bank))
         .filter((t) => !products.length || products.includes(accById.get(t.accountId)?.product ?? ''))
-        .map((t) => ({ ...t, counterparty: counterparty(t), description: description(t), flowLabel: FLOW_LABEL[t.flow] })),
-    [a.txs, accountFilter, banks, products, accById],
+        .filter((t) => !catFilter.length || catFilter.includes(t.category))
+        .filter((t) => !month || t.date.startsWith(month))
+        .map((t) => ({ ...t, counterparty: counterparty(t), description: description(t), flowLabel: FLOW_LABEL[t.flow], categoryName: categoryName(a.categories, t.category) })),
+    [a.txs, a.categories, accountFilter, banks, products, accById, catFilter, month],
   );
   if (a.accounts.length === 0) return <AccountsEmpty />;
 
@@ -53,6 +61,7 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
 
   return (
     <Stack>
+      {picker.modal}
       <Group align="flex-end">
         <MultiSelect
           label="Účty"
@@ -87,6 +96,31 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
           clearable
           w={240}
         />
+        <MultiSelect
+          label="Kategorie"
+          placeholder={catFilter.length ? undefined : 'Všechny kategorie'}
+          data={[{ group: 'Bez kategorie', items: [{ value: '-', label: UNCAT_LABEL }] }, ...categoryOptions(a.categories)]}
+          value={catFilter.map((c) => c || '-')}
+          onChange={(v) => {
+            const p = new URLSearchParams(params);
+            p.delete('kategorie');
+            for (const c of v) p.append('kategorie', c);
+            setParams(p, { replace: true });
+          }}
+          clearable
+          searchable
+          w={260}
+          data-testid="filter-categories"
+        />
+        {month && (
+          <Badge size="lg" variant="light" style={{ cursor: 'pointer' }} onClick={() => {
+            const p = new URLSearchParams(params);
+            p.delete('mesic');
+            setParams(p, { replace: true });
+          }}>
+            {month} ✕
+          </Badge>
+        )}
       </Group>
       <SimpleGrid cols={{ base: 2, md: 4 }}>
         <Stat label="Pohybů" value={rows.length.toLocaleString('cs-CZ')} hint="Počet pohybů odpovídajících filtrům nad tabulkou (bez fulltextového hledání)." />
@@ -132,6 +166,13 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
                 {r.description || '–'}
               </Text>
             ),
+          },
+          {
+            accessor: 'categoryName',
+            title: 'Kategorie',
+            hint: 'Kategorii určuje (v tomto pořadí): ruční zařazení, vaše pravidla, převody mezi účty, typ transakce v bance, vestavěný slovník obchodníků a návrh podle dříve ručně zařazené stejné protistrany. Ikona vlevo ukazuje zdroj, tooltip důvod. Změnou kategorie můžete zařadit i všechny transakce stejné protistrany.',
+            render: (r) => <TxCategorySelect t={r} a={a} onPick={picker.pick} />,
+            width: 220,
           },
           { accessor: 'bankType', title: 'Typ (banka)', filterable: true, render: (r) => <Text size="xs">{r.bankType}</Text> },
           {

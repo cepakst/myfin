@@ -4,8 +4,9 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyReply } from 'fastify';
 import type { DateRange, ImportMode } from '../core/exportStore.js';
 import { mergeSettings, type Settings } from '../core/settings.js';
-import { sanitizeAccountsConfig } from '../core/accounts/analytics.js';
-import { accountsState, refreshAccounts, saveAccountsConfig } from './accountsEngine.js';
+import { effectiveCategories, sanitizeAccountsConfig } from '../core/accounts/analytics.js';
+import { MAX_RULES, ruleSignature, sanitizeRules } from '../core/accounts/categories.js';
+import { accountsState, loadAccountsConfig, refreshAccounts, saveAccountsConfig } from './accountsEngine.js';
 import { computeSnapshot, instrumentDetail, state } from './engine.js';
 import { cancelImport, commitImport, ImportError, isInside, previewInbox, previewUpload, replanImport } from './importer.js';
 import { DATA_DIR, DEFAULT_EXPORTS_DIR, DEMO_SETTINGS_FILE, STORE_DIR, WEB_DIST } from './paths.js';
@@ -71,14 +72,52 @@ export async function createServer() {
     return accountsState.snapshot;
   });
 
-  app.put<{ Body: unknown }>('/api/accounts/config', { bodyLimit: 512 * 1024 }, async (req, reply) => {
+  app.put<{ Body: unknown }>('/api/accounts/config', { bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
     if (!accountsState.snapshot) return reply.code(503).send({ error: 'Data se ještě načítají' });
     // a malformed request must never overwrite the saved configuration with an empty one
     const body = req.body as Record<string, unknown> | null;
     if (!body || typeof body !== 'object' || Array.isArray(body) || body.version !== 1) return reply.code(400).send({ error: 'Neplatné nastavení účtů' });
     // demo mode keeps its own configuration file, so the user's real configuration is never touched
-    const config = sanitizeAccountsConfig(req.body);
+    // parts the client does not send keep their stored value (each Settings section saves its own part);
+    // `categories: null` restores the default categories
+    let stored;
+    try {
+      stored = loadAccountsConfig(accountsState.demo, true);
+    } catch {
+      stored = undefined; // a damaged file is replaced by what the user saves now
+    }
+    const config = sanitizeAccountsConfig({ ...stored, ...(req.body as Record<string, unknown>) });
     saveAccountsConfig(accountsState.demo, config);
+    return refreshAccounts();
+  });
+
+  // assigns categories to transactions (null = back to automatic) and optionally adds rules
+  app.post<{ Body: { assign?: Record<string, string | null>; rules?: unknown[] } }>('/api/accounts/categorize', { bodyLimit: 2 * 1024 * 1024 }, async (req, reply) => {
+    if (!accountsState.snapshot) return reply.code(503).send({ error: 'Data se ještě načítají' });
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) return reply.code(400).send({ error: 'Neplatný požadavek' });
+    const { assign, rules } = req.body;
+    if ((assign !== undefined && (typeof assign !== 'object' || assign === null || Array.isArray(assign))) || (rules !== undefined && !Array.isArray(rules))) {
+      return reply.code(400).send({ error: 'Neplatný požadavek' });
+    }
+    let cfg;
+    try {
+      cfg = loadAccountsConfig(accountsState.demo, true);
+    } catch (e) {
+      return reply.code(500).send({ error: (e as Error).message });
+    }
+    const overrides: Record<string, string> = Object.assign(Object.create(null), cfg.overrides);
+    for (const [k, v] of Object.entries(assign ?? {})) {
+      if (v === null) delete overrides[k];
+      else overrides[k] = v;
+    }
+    // new rules go first: the latest decision of the user wins over older rules
+    // an older rule with the same condition is replaced, so repeated decisions do not pile up
+    const newRules = sanitizeRules(rules ?? [], new Set(effectiveCategories(cfg).map((c) => c.id)));
+    const sameMatch = new Set(newRules.map((r) => ruleSignature(r.match)));
+    const kept = cfg.rules.filter((r) => !sameMatch.has(ruleSignature(r.match)));
+    if (newRules.length + kept.length > MAX_RULES) return reply.code(400).send({ error: `Pravidel může být nejvýše ${MAX_RULES}. Smažte nepotřebná pravidla v Nastavení.` });
+    const merged = sanitizeAccountsConfig({ ...cfg, overrides, rules: [...newRules, ...kept] });
+    saveAccountsConfig(accountsState.demo, merged);
     return refreshAccounts();
   });
 

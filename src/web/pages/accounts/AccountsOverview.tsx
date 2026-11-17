@@ -78,6 +78,21 @@ export function AccountsOverviewPage({ a }: { a: AccountsSnapshot }) {
         <Stat label="Investováno (12 měsíců)" value={czk(t.invested12m)} hint="Čisté převody na investiční účty (brokeři a účty označené v Nastavení jako investiční) za posledních 12 měsíců." />
       </SimpleGrid>
 
+      {(a.categorization.uncategorized > 0 || a.categorization.suggestions > 0) && (
+        <Alert color="blue" data-testid="categorize-hint">
+          <Group justify="space-between">
+            <Text size="sm">
+              Zařazeno {pct(a.categorization.expenseTotalCzk > 0 ? a.categorization.expenseCategorizedCzk / a.categorization.expenseTotalCzk : 1, 0)} výdajů. Nezařazených transakcí:{' '}
+              {a.categorization.uncategorized}
+              {a.categorization.suggestions > 0 ? `, návrhů k potvrzení: ${a.categorization.suggestions}` : ''}.
+            </Text>
+            <Button component={Link} to="/ucty/zaradit" size="xs" variant="light">
+              Zařadit
+            </Button>
+          </Group>
+        </Alert>
+      )}
+
       <Section title="Účty" hint="Zůstatek k poslednímu dni s daty. U účtů, jejichž export zůstatek neobsahuje (Raiffeisenbank), zadejte aktuální zůstatek v Nastavení.">
         <Table.ScrollContainer minWidth={640}>
           <Table striped highlightOnHover data-testid="accounts-table">

@@ -5,7 +5,8 @@ import type { EChartsOption } from 'echarts';
 import type { ReactNode } from 'react';
 import { czkRaw } from './format';
 
-export function Chart({ option, height = 320 }: { option: EChartsOption; height?: number }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function Chart({ option, height = 320, onEvents }: { option: EChartsOption; height?: number; onEvents?: Record<string, (params: any) => void> }) {
   const scheme = useComputedColorScheme('light');
   return (
     <ReactECharts
@@ -14,6 +15,7 @@ export function Chart({ option, height = 320 }: { option: EChartsOption; height?
       style={{ height, width: '100%' }}
       notMerge
       lazyUpdate
+      onEvents={onEvents}
     />
   );
 }

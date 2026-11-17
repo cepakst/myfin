@@ -4,7 +4,22 @@
  * converter passed in.
  */
 import { addDays } from '../util.js';
+import { normAccount } from './accountNumber.js';
 import { mergeBalances } from './balances.js';
+import {
+  categorize,
+  cpKey,
+  cpName,
+  DEFAULT_CATEGORIES,
+  INVESTMENT,
+  sanitizeCategories,
+  sanitizeOverrides,
+  sanitizeRules,
+  UNCATEGORIZED,
+  type Category,
+  type CategoryRule,
+  type CategorySource,
+} from './categories.js';
 import { BANK_NAME, type BalancePoint, type Bank, type BankAccountData, type BankLedger, type BankTx, type ProductType } from './types.js';
 
 /** How a movement counts in the statistics */
@@ -31,10 +46,21 @@ export interface AccountsConfig {
   accounts: Record<string, AccountConfig>;
   /** accounts outside the imported banks that belong to the user (other banks, brokers) */
   ownAccounts: OwnAccount[];
+  /** the user's categories; missing = the built-in default set */
+  categories?: Category[];
+  /** categorisation rules, the first matching one wins */
+  rules: CategoryRule[];
+  /** category assigned manually to a transaction (`BankTx.key` -> category id, '' = uncategorised) */
+  overrides: Record<string, string>;
 }
 
 export function defaultAccountsConfig(): AccountsConfig {
-  return { version: 1, accounts: {}, ownAccounts: [] };
+  return { version: 1, accounts: {}, ownAccounts: [], rules: [], overrides: {} };
+}
+
+/** Categories in effect (the user's, or the default set) */
+export function effectiveCategories(c: Pick<AccountsConfig, 'categories'>): Category[] {
+  return c.categories ?? DEFAULT_CATEGORIES;
 }
 
 const PRODUCTS: ProductType[] = ['current', 'savings', 'term', 'credit', 'other'];
@@ -72,17 +98,15 @@ export function sanitizeAccountsConfig(raw: unknown): AccountsConfig {
       });
     }
   }
+  const categories = sanitizeCategories(r.categories);
+  if (categories) out.categories = categories;
+  const ids = new Set(effectiveCategories(out).map((c) => c.id));
+  out.rules = sanitizeRules(r.rules, ids);
+  out.overrides = sanitizeOverrides(r.overrides, ids);
   return out;
 }
 
-/** Czech account number `[prefix-]number/bankcode` without leading zeros, or undefined. */
-export function normAccount(raw: string | undefined): string | undefined {
-  const m = /^\s*(?:(\d{1,6})\s*-\s*)?(\d{2,10})\s*\/\s*(\d{4})\s*$/.exec(raw ?? '');
-  if (!m) return undefined;
-  const prefix = (m[1] ?? '').replace(/^0+/, '');
-  const number = m[2].replace(/^0+/, '');
-  return `${prefix ? `${prefix}-` : ''}${number}/${m[3]}`;
-}
+export { normAccount } from './accountNumber.js';
 
 /** Brokers whose accounts receive investment deposits (matched on the counterparty name) */
 // no word boundary around degiro/flatex: the counterparty is usually "flatexDEGIRO Bank AG"
@@ -250,10 +274,20 @@ export interface AccountView {
 }
 
 export interface TxView extends BankTx {
+  /** how the movement counts in the statistics (follows the category kind when categorised) */
   flow: TxFlow;
   otherAccount?: string;
   amountCzk: number | null;
   accountName: string;
+  /** category id ('' = uncategorised) */
+  category: string;
+  categorySource: CategorySource;
+  categoryReason: string;
+  ruleId?: string;
+  /** counterparty identity (groups similar transactions) */
+  cpKey: string;
+  /** counterparty label for grouping (normalised name, account or type) */
+  cpLabel: string;
 }
 
 export interface MonthFlows {
@@ -270,6 +304,10 @@ export interface MonthFlows {
 
 export interface AccountsSummary {
   accounts: AccountView[];
+  /** categories in effect (the user's or the default set) */
+  categories: Category[];
+  /** how much of the spending is categorised (visible accounts; suggestions count as not yet) */
+  categorization: { expenseTotalCzk: number; expenseCategorizedCzk: number; uncategorized: number; suggestions: number };
   txs: TxView[];
   months: MonthFlows[];
   totals: {
@@ -353,10 +391,32 @@ export function summarizeAccounts(ledger: BankLedger, config: AccountsConfig, to
   const accById = new Map(accounts.map((a) => [a.id, a]));
   const visible = new Set(accounts.filter((a) => !a.hidden).map((a) => a.id));
 
-  const txs: TxView[] = ledger.txs
+  const categories = effectiveCategories(config);
+  const catKind = new Map(categories.map((c) => [c.id, c.kind]));
+  const withFlow = ledger.txs.map((t) => ({ ...t, flow: flows.get(t.key)!.flow }));
+  const cats = categorize(withFlow, { categories, rules: config.rules, overrides: config.overrides });
+  const txs: TxView[] = withFlow
     .map((t) => {
       const f = flows.get(t.key)!;
-      return { ...t, flow: f.flow, otherAccount: f.otherAccount, amountCzk: czk(t.amount, t.currency, t.date), accountName: accById.get(t.accountId)?.displayName ?? t.accountId };
+      const c = cats.get(t.key)!;
+      // the category decides how the movement counts: a neutral category takes it out of income/expense
+      // a suggestion does not change the statistics until the user confirms it
+      const kind = c.category === UNCATEGORIZED || c.source === 'learned' ? undefined : catKind.get(c.category);
+      const flow: TxFlow = kind === 'neutral' ? (c.category === INVESTMENT ? 'investment' : 'transfer') : kind === 'expense' ? 'expense' : kind === 'income' ? 'income' : f.flow;
+      const key = cpKey(t);
+      return {
+        ...t,
+        flow,
+        otherAccount: f.otherAccount,
+        amountCzk: czk(t.amount, t.currency, t.date),
+        accountName: accById.get(t.accountId)?.displayName ?? t.accountId,
+        category: c.category,
+        categorySource: c.source,
+        categoryReason: c.reason,
+        ruleId: c.ruleId,
+        cpKey: key,
+        cpLabel: cpName(t) || (key.startsWith('acc:') ? key.slice(4) : t.bankType) || '–',
+      };
     })
     .sort((a, b) => (a.date === b.date ? (a.key < b.key ? 1 : -1) : a.date < b.date ? 1 : -1));
 
@@ -390,8 +450,18 @@ export function summarizeAccounts(ledger: BankLedger, config: AccountsConfig, to
   const invested12m = round2(last12.reduce((s, m) => s + m.invested, 0));
   const unconvertible = accounts.filter((a) => !a.hidden && a.balanceCzk === null);
   for (const a of unconvertible) warnings.push({ source: a.displayName, message: `Pro měnu ${a.currency} není k dispozici kurz ČNB – účet není započten do celkového zůstatku v Kč.` });
+  const visibleTx = txs.filter((t) => visible.has(t.accountId));
+  const expenses = visibleTx.filter((t) => t.flow === 'expense' && t.amount < 0);
+  const absSum = (xs: TxView[]) => xs.reduce((s, t) => s + Math.abs(t.amountCzk ?? 0), 0);
   return {
     accounts,
+    categories,
+    categorization: {
+      expenseTotalCzk: round2(absSum(expenses)),
+      expenseCategorizedCzk: round2(absSum(expenses.filter((t) => t.category !== UNCATEGORIZED && t.categorySource !== 'learned'))),
+      uncategorized: visibleTx.filter((t) => t.category === UNCATEGORIZED).length,
+      suggestions: visibleTx.filter((t) => t.categorySource === 'learned').length,
+    },
     txs,
     months: monthFlows,
     totals: {

@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { api, useSnapshot, type ImportPreview, type InboxFile, type Settings } from '../api';
 import { ImportDialog, MODE_LABEL, type ImportDecision } from '../ImportDialog';
 import { AccountsSettings } from './accounts/AccountsSettings';
+import { CategoriesSettings } from './accounts/CategoriesSettings';
 import { Section } from '../components';
 import { DataGrid } from '../DataGrid';
 import { useSetDemo } from '../demo';
@@ -265,6 +266,8 @@ export function SettingsPage() {
       </Section>
 
       <AccountsSettings />
+
+      <CategoriesSettings />
 
       <Section title="Daňová situace a přepočet měn">
         <Stack>

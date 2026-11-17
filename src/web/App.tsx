@@ -6,6 +6,7 @@ import {
   IconCalendarStats,
   IconCash,
   IconChartLine,
+  IconChartDonut,
   IconChartPie,
   IconHome,
   IconListDetails,
@@ -13,12 +14,15 @@ import {
   IconRefresh,
   IconSettings,
   IconSparkles,
+  IconTags,
   IconTransfer,
 } from '@tabler/icons-react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { api, useAccounts, useSnapshot, useStatus } from './api';
 import { Brand } from './Brand';
 import { DemoBadge } from './demo';
+import { AccountsCategoriesPage } from './pages/accounts/AccountsCategories';
+import { AccountsCategorizePage } from './pages/accounts/AccountsCategorize';
 import { AccountsOverviewPage } from './pages/accounts/AccountsOverview';
 import { AccountsTransactionsPage } from './pages/accounts/AccountsTransactions';
 import { DividendsPage } from './pages/Dividends';
@@ -42,6 +46,8 @@ const NAV: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: '/ucty', label: 'Přehled účtů', icon: IconBuildingBank },
       { to: '/ucty/transakce', label: 'Transakce', icon: IconTransfer },
+      { to: '/ucty/kategorie', label: 'Výdaje a příjmy', icon: IconChartDonut },
+      { to: '/ucty/zaradit', label: 'Zařadit', icon: IconTags },
     ],
   },
   {
@@ -109,6 +115,8 @@ export function App() {
       <Routes>
         <Route path="/ucty" element={<AccountsOverviewPage a={accounts.data} />} />
         <Route path="/ucty/transakce" element={<AccountsTransactionsPage a={accounts.data} />} />
+        <Route path="/ucty/kategorie" element={<AccountsCategoriesPage a={accounts.data} />} />
+        <Route path="/ucty/zaradit" element={<AccountsCategorizePage a={accounts.data} />} />
       </Routes>
     );
   } else if (!snap.data) body = <Loading status={status.data} />;
