@@ -95,7 +95,7 @@ test.describe('accounts module', () => {
     const by = Object.fromEntries(s.accounts.map((a) => [a.id, a]));
     expect(by[FIO]).toMatchObject({ balance: 15010.49, anchored: true, productInferred: 'savings', txCount: 3 });
     expect(by[KB]).toMatchObject({ balance: 38201, anchored: true, product: 'current', txCount: 7 });
-    expect(by[RB]).toMatchObject({ balance: 4249.5, anchored: false, displayName: 'eKonto TEST', txCount: 5 });
+    expect(by[RB]).toMatchObject({ balance: 4249.5, anchored: false, displayName: 'RB · Běžný · 1112223335', txCount: 5 });
     expect(s.totals.balanceCzk).toBeCloseTo(15010.49 + 38201 + 4249.5, 2);
     expect(s.warnings.filter((w) => w.message.includes('nesedí'))).toEqual([]);
     expect(s.warnings.filter((w) => w.message.includes('neobsahuje zůstatek'))).toHaveLength(1);
@@ -181,7 +181,8 @@ test.describe('accounts module', () => {
     await expect(kb).toContainText(kc(38201));
     await expect(kb).toContainText('31. 1. 2025');
     const rb = accountRow(page, RB);
-    await expect(rb).toContainText('eKonto TEST');
+    // default name: bank · product · number (the export's account name is not used)
+    await expect(rb).toContainText('RB · Běžný · 1112223335');
     await expect(rb).toContainText('Raiffeisenbank');
     await expect(rb).toContainText(kc(4249.5));
     await expect(rb.getByText('odhad', { exact: true })).toBeVisible(); // the RB export carries no balance
@@ -210,7 +211,7 @@ test.describe('accounts module', () => {
   test('transactions: filters by account (link from the overview), bank, product and search', async ({ page }) => {
     await accounts(page);
     await page.goto('/#/ucty');
-    await accountRow(page, RB).getByRole('link', { name: 'eKonto TEST' }).click();
+    await accountRow(page, RB).getByRole('link', { name: 'RB · Běžný · 1112223335' }).click();
     await expect(page).toHaveURL(/#\/ucty\/transakce\?ucet=1112223335%2F5500$/);
     // the default period is the last 12 months; the fixtures are older
     await expect(page.getByTestId('filter-period')).toHaveValue('Posledních 12 měsíců');
@@ -414,7 +415,7 @@ test.describe('accounts module in demo mode', () => {
     await expect(page.locator('header').getByTestId('demo-badge')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('accounts-table').locator('tbody tr')).toHaveCount(4);
     await expect(page.getByTestId('accounts-table')).toContainText('Demo karta');
-    await expect(page.getByTestId('accounts-table')).not.toContainText('eKonto TEST');
+    await expect(page.getByTestId('accounts-table')).not.toContainText('1112223335');
 
     // back to the own exports: the fixtures and the untouched real configuration
     await page.request.put('/api/demo', { data: { enabled: false } });

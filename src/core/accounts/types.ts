@@ -5,6 +5,8 @@ export type Bank = 'FIO' | 'KB' | 'RB';
 export const BANKS: Bank[] = ['FIO', 'KB', 'RB'];
 
 export const BANK_NAME: Record<Bank, string> = { FIO: 'Fio banka', KB: 'Komerční banka', RB: 'Raiffeisenbank' };
+/** short bank name for default account names */
+export const BANK_SHORT: Record<Bank, string> = { FIO: 'Fio', KB: 'KB', RB: 'RB' };
 
 /** Czech bank codes of the supported banks */
 export const BANK_CODE: Record<Bank, string> = { FIO: '2010', KB: '0100', RB: '5500' };
@@ -18,6 +20,18 @@ export const PRODUCT_LABEL: Record<ProductType, string> = {
   credit: 'Kreditní karta / úvěr',
   other: 'Jiný produkt',
 };
+
+/** short product name for default account names */
+export const PRODUCT_SHORT: Record<ProductType, string> = { current: 'Běžný', savings: 'Spořicí', term: 'Termínovaný', credit: 'Úvěr', other: 'Jiný' };
+
+/**
+ * Default account name: bank, product and number ("RB · Běžný · 1234567890"), plus the currency of
+ * a foreign currency account. The name from the export is not used: RB fills in the holder's name,
+ * the same for every account.
+ */
+export function defaultAccountName(a: { bank: Bank; number: string; currency: string }, product: ProductType): string {
+  return [BANK_SHORT[a.bank], PRODUCT_SHORT[product], a.number, a.currency !== 'CZK' ? a.currency : ''].filter(Boolean).join(' · ');
+}
 
 export interface BankTx {
   /** stable id across re-imports: `<bank>:<account>:<bank transaction id>` (or a content hash) */

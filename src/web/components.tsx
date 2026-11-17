@@ -1,34 +1,90 @@
 import { ActionIcon, Card, CopyButton, Group, Paper, Select, Text, Tooltip, useComputedColorScheme } from '@mantine/core';
+import { useElementSize } from '@mantine/hooks';
 import { IconCheck, IconCopy, IconInfoCircle } from '@tabler/icons-react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { czkRaw } from './format';
+import { legendRows } from './chartLegend';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function Chart({ option, height = 320, onEvents }: { option: EChartsOption; height?: number; onEvents?: Record<string, (params: any) => void> }) {
   const scheme = useComputedColorScheme('light');
+  const { ref, width } = useElementSize();
+  // a resize alone must not replace the option (that would reset zoom and hidden series): only a
+  // change of the legend layout does
+  const layout = legendLayout(option, width);
+  const full = useMemo(() => withDefaults(option, layout), [option, layout]);
   return (
-    <ReactECharts
-      option={withDefaults(option)}
-      theme={scheme === 'dark' ? 'dark' : undefined}
-      style={{ height, width: '100%' }}
-      notMerge
-      lazyUpdate
-      onEvents={onEvents}
-    />
+    <div ref={ref} style={{ minHeight: height }}>
+      {width > 0 && (
+        <ReactECharts option={full} theme={scheme === 'dark' ? 'dark' : undefined} style={{ height, width: '100%' }} notMerge lazyUpdate onEvents={onEvents} />
+      )}
+    </div>
   );
+}
+
+/** legend rows shown before the legend turns into one scrolling row with arrows */
+const MAX_LEGEND_ROWS = 3;
+const LEGEND_ROW = 22;
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+
+function textWidth(s: string): number {
+  if (measureCtx === undefined) measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  if (!measureCtx) return s.length * 7;
+  measureCtx.font = '12px sans-serif';
+  return measureCtx.measureText(s).width;
+}
+
+/** Rows of each top legend ("" = no legend to lay out): 1–3 = wrapped, 0 = one scrolling row. */
+function legendLayout(option: EChartsOption, width: number): string {
+  const o = option as Record<string, any>;
+  const list = !o.legend ? [] : Array.isArray(o.legend) ? o.legend : [o.legend];
+  return list
+    .map((l: any) => {
+      if (!isAutoLegend(l)) return '-';
+      const rows = legendRows(legendNames(o, l), width, textWidth);
+      return String(rows > MAX_LEGEND_ROWS ? 0 : rows);
+    })
+    .join(',');
+}
+
+/** a legend placed by these defaults: shown, horizontal, no position or type of its own */
+const isAutoLegend = (l: any) => l && l.show !== false && l.top === undefined && l.bottom === undefined && l.orient !== 'vertical' && !l.type;
+
+function legendNames(o: Record<string, any>, l: any): string[] {
+  if (Array.isArray(l.data)) return l.data.map((d: any) => (typeof d === 'string' ? d : String(d?.name ?? '')));
+  const series = Array.isArray(o.series) ? o.series : o.series ? [o.series] : [];
+  const names: string[] = [];
+  for (const s of series) {
+    // pie legends list the slices
+    if (s.type === 'pie') for (const d of s.data ?? []) names.push(String(d?.name ?? ''));
+    else if (s.name) names.push(String(s.name));
+  }
+  return [...new Set(names)];
 }
 
 const axisNum = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 });
 
-// Legend on top (never collides with x-axis labels), Czech number format on value axes.
-function withDefaults(option: EChartsOption): EChartsOption {
+// Legend on top (never collides with x-axis labels): wrapped into up to 3 rows, beyond that one
+// scrolling row with arrows. Czech number format on value axes.
+function withDefaults(option: EChartsOption, layout: string): EChartsOption {
   const o: Record<string, any> = { backgroundColor: 'transparent', ...option };
-  const fixLegend = (l: any) => (l && l.top === undefined && l.bottom === undefined && l.orient !== 'vertical' ? { type: 'scroll', ...l, top: 0 } : l);
+  const rowsOf = layout.split(',');
+  let extraRows = 0;
+  let i = 0;
+  const fixLegend = (l: any) => {
+    const rows = Number(rowsOf[i++]);
+    if (!isAutoLegend(l)) return l;
+    if (!rows) return { type: 'scroll', ...l, top: 0 };
+    extraRows = Math.max(extraRows, rows - 1);
+    return { type: 'plain', ...l, top: 0 };
+  };
   if (o.legend) o.legend = Array.isArray(o.legend) ? o.legend.map(fixLegend) : fixLegend(o.legend);
   const hasTopLegend = o.legend && (Array.isArray(o.legend) ? o.legend : [o.legend]).some((l: any) => l.top === 0);
   if ((o.xAxis || o.yAxis) && !o.grid) o.grid = { containLabel: true, left: 10, right: 20, bottom: 10, top: hasTopLegend ? 40 : 20 };
+  // the plot moves down by the extra legend rows
+  if (extraRows && o.grid && !Array.isArray(o.grid) && typeof o.grid.top === 'number') o.grid = { ...o.grid, top: o.grid.top + extraRows * LEGEND_ROW };
   const fixAxis = (a: any) =>
     a && a.type === 'value' && !a.axisLabel?.formatter ? { ...a, axisLabel: { ...a.axisLabel, formatter: (v: number) => axisNum.format(v) } } : a;
   for (const k of ['xAxis', 'yAxis']) if (o[k]) o[k] = Array.isArray(o[k]) ? o[k].map(fixAxis) : fixAxis(o[k]);
