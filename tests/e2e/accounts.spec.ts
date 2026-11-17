@@ -148,18 +148,19 @@ test.describe('accounts module', () => {
 
     await page.goto('/#/');
     const main = page.locator('main');
-    for (const l of ['Celkový majetek', 'Na účtech', 'Investice']) await expect(main.getByText(l, { exact: true }).first()).toBeVisible();
+    for (const l of ['Čisté jmění', 'Účty', 'Investice']) await expect(main.getByText(l, { exact: true }).first()).toBeVisible();
+    await expect(main.getByText('Na účtech', { exact: true })).toHaveCount(0); // the old tiles moved into the net worth sub-line and the module sections
     await expect(main.getByText('Hodnota portfolia', { exact: true })).toHaveCount(0);
     const s = await accounts(page);
-    await expect.poll(async () => flat(await statCard(page, 'Na účtech').textContent())).toContain(kc(s.totals.balanceCzk));
-    await expect(statCard(page, 'Na účtech')).toContainText('3 účtů');
+    await expect.poll(async () => flat(await statCard(page, 'Čisté jmění').textContent())).toContain(`účty ${kc(s.totals.balanceCzk)}`);
+    await expect(main.getByText(/Zůstatek:.*účtů: 3/)).toBeVisible();
     // links to both modules
     await main.getByRole('link', { name: /Přehled účtů/ }).click();
     await expect(page).toHaveURL(/#\/ucty$/);
 
     await page.goto('/#/investice');
     await expect(page.locator('main').getByText('Hodnota portfolia', { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator('main').getByText('Celkový majetek', { exact: true })).toHaveCount(0);
+    await expect(page.locator('main').getByText('Čisté jmění', { exact: true })).toHaveCount(0);
   });
 
   // ---------- overview ----------
@@ -310,7 +311,7 @@ test.describe('accounts module', () => {
     // the Fio interest (+12,34) no longer counts as income
     await expect(statCard(page, 'Příjmy')).toContainText(kc(50000));
     await page.goto('/#/');
-    await expect(statCard(page, 'Na účtech')).toContainText(kc(38201 + 4249.5));
+    await expect(statCard(page, 'Čisté jmění')).toContainText(`účty ${kc(38201 + 4249.5)}`);
   });
 
   test('settings: an investment account turns an expense into an investment; an invalid number is refused', async ({ page }) => {
@@ -428,8 +429,8 @@ test.describe('accounts module in demo mode', () => {
     await waitForSnapshot(page, DEMO_TIMEOUT);
     await page.goto('/#/');
     const main = page.locator('main');
-    await expect(main.getByText('Celkový majetek', { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect.poll(async () => flat(await statCard(page, 'Na účtech').textContent()), { timeout: 30_000 }).toContain('4 účtů');
+    await expect(main.getByText('Čisté jmění', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(main.getByText(/Zůstatek:.*účtů: 4/)).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('header').getByTestId('demo-badge')).toBeVisible();
   });
 });
