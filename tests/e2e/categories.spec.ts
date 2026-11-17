@@ -326,6 +326,9 @@ test.describe('accounts: categorisation', () => {
     await expect(table).not.toContainText('Investice');
     await expect(page.locator('main').getByText('Výdaje celkem', { exact: true })).toBeVisible();
     await expect(page.locator('main').getByText('Výdaje celkem', { exact: true }).locator('xpath=../..')).toContainText(kc(19551.35));
+    // the same without the taxes category (1,85 Kč tax on interest in the fixtures)
+    await expect(page.locator('main').getByText('Výdaje celkem', { exact: true }).locator('xpath=../..')).toContainText(`bez daní ${kc(19551.35 - 1.85)}`);
+    await expect(page.locator('main').getByText('Měsíční průměr', { exact: true }).locator('xpath=../..')).toContainText('bez daní');
 
     await page.locator('.mantine-SegmentedControl-root').getByText('Příjmy', { exact: true }).click();
     await expect(table.locator('tbody tr')).toHaveCount(2);
