@@ -10,6 +10,7 @@ import { DEFAULT_PERIOD, monthLabel, periodMonths, periodOptions as periodChoice
 
 type Tx = AccountsSnapshot['txs'][number];
 type Kind = 'expense' | 'income';
+const TAXES = 'taxes';
 
 /** Spending and income by category for a period, with the monthly trend and top counterparties. */
 export function AccountsCategoriesPage({ a }: { a: AccountsSnapshot }) {
@@ -38,6 +39,8 @@ export function AccountsCategoriesPage({ a }: { a: AccountsSnapshot }) {
   }
   const rows = [...byCat].map(([id, e]) => ({ id, name: categoryName(a.categories, id), ...e })).sort((x, y) => y.sum - x.sum);
   const total = rows.reduce((s, r) => s + r.sum, 0);
+  // taxes are a large, non-discretionary expense for the self-employed: also shown without them
+  const taxes = kind === 'expense' ? (byCat.get(TAXES)?.sum ?? 0) : 0;
   const nMonths = Math.max(1, months.length);
   const sel = selected !== null && byCat.has(selected) ? selected : (rows[0]?.id ?? null);
 
@@ -82,8 +85,18 @@ export function AccountsCategoriesPage({ a }: { a: AccountsSnapshot }) {
         )}
       </Group>
       <SimpleGrid cols={{ base: 2, md: 4 }}>
-        <Stat label={kind === 'expense' ? 'Výdaje celkem' : 'Příjmy celkem'} value={czk(total)} sub={`${txs.length} transakcí`} hint="Součet za zvolené období bez převodů mezi vlastními účty a investic. Skryté účty se nezapočítávají." />
-        <Stat label="Měsíční průměr" value={czk(total / nMonths)} sub={`${nMonths} měsíců`} hint="Součet za období vydělený počtem měsíců v období." />
+        <Stat
+          label={kind === 'expense' ? 'Výdaje celkem' : 'Příjmy celkem'}
+          value={czk(total)}
+          sub={`${txs.length} transakcí${taxes ? ` · bez daní ${czk(total - taxes)}` : ''}`}
+          hint={`Součet za zvolené období bez převodů mezi vlastními účty a investic. Skryté účty se nezapočítávají.${taxes ? ' „Bez daní“ nepočítá kategorii Daně (daň z příjmů, sociální pojištění a další platby úřadům).' : ''}`}
+        />
+        <Stat
+          label="Měsíční průměr"
+          value={czk(total / nMonths)}
+          sub={`${nMonths} měsíců${taxes ? ` · bez daní ${czk((total - taxes) / nMonths)}` : ''}`}
+          hint="Součet za období vydělený počtem měsíců v období."
+        />
         <Stat label="Největší kategorie" value={rows[0]?.name ?? '–'} sub={rows[0] ? `${czk(rows[0].sum)} · ${pct(total ? rows[0].sum / total : null, 0)}` : undefined} />
         <Stat label="Nezařazeno" value={czk(byCat.get('')?.sum ?? 0)} sub={pct(total ? (byCat.get('')?.sum ?? 0) / total : null, 0)} hint="Část bez kategorie. Zařadíte ji na stránce Zařadit." />
       </SimpleGrid>
