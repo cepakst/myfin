@@ -1,8 +1,23 @@
 # Myfin – moje finance přehledně
 
-Lokální aplikace pro přehled investic a daní z exportů brokerů **Degiro** a **XTB**.
+Lokální aplikace pro přehled financí: bankovní účty z výpisů **Fio banky**, **Komerční banky** a **Raiffeisenbank** a investice a daně z exportů brokerů **Degiro** a **XTB**.
 
-![Přehled aplikace Myfin s ukázkovými daty](docs/screenshot.png)
+![Úvodní stránka aplikace Myfin s ukázkovými daty](docs/screenshot.png)
+
+Úvodní stránka spojuje oba moduly: vývoj čistého jmění (účty + investice), co ho za zvolené období změnilo (ušetřeno z příjmů, zhodnocení investic, investováno z jiných zdrojů, nově přidané účty) a složení majetku.
+
+## Účty
+
+![Výdaje a příjmy podle kategorií s ukázkovými daty](docs/screenshot-accounts.png)
+
+- **Přehled účtů:** zůstatky, příjmy, výdaje, míra úspor a investovaná částka za posledních 12 měsíců, vývoj zůstatků po účtech, bankách nebo typech produktu.
+- **Transakce:** všechny pohyby ze všech účtů s hledáním, filtrem období a protistrany a změnou kategorie přímo v tabulce.
+- **Výdaje a příjmy:** rozpad podle kategorií a měsíců, největší protistrany, průměr za měsíc (i bez daní).
+- **Zařadit:** nezařazené transakce seskupené podle protistrany; zařazení skupiny rovnou vytvoří pravidlo pro další pohyby.
+- Kategorizace probíhá lokálně v tomto pořadí: ruční zařazení, vaše pravidla, převody mezi vlastními účty a do investic, typ bankovní transakce, vestavěný slovník obchodníků, návrh podle podobných transakcí. Převody mezi vlastními účty se do příjmů a výdajů nepočítají.
+- V **Nastavení** účtů lze zadat název, typ produktu, zůstatek (u účtů, jejichž výpisy ho neobsahují), skrýt účet, označit vlastní a investiční účty a spravovat kategorie a pravidla.
+
+## Investice a daně
 
 - Výnosy po letech v % (TWR, MWR/XIRR) i v Kč a jejich struktura: realizované a nerealizované zisky, dividendy, srážková daň, úroky a poplatky.
 - Portfolio a nákupní loty (FIFO), postup k časovému testu 3 roky.
@@ -104,17 +119,18 @@ Soubory z exportní složky, které na rozhodnutí čekají, jsou v Nastavení o
 
 ### Demo data
 
-Aplikace obsahuje ukázkové exporty ve složce `demo/`: smyšlené portfolio u Degiro (EUR) a XTB (CZK) od roku 2023. Obchody jsou na skutečných instrumentech (Apple, NVIDIA včetně splitu 10:1, ČEZ, Komerční banka, ETF VWCE…) za skutečné historické ceny. Obsahují dividendy z několika zemí, prodeje před časovým testem i po něm a ztrátový prodej.
+Aplikace obsahuje ukázkové exporty ve složce `demo/`: smyšlené portfolio u Degiro (EUR) a XTB (CZK) od roku 2023. Obchody jsou na skutečných instrumentech (Apple, NVIDIA včetně splitu 10:1, ČEZ, Komerční banka, ETF VWCE…) za skutečné historické ceny. Obsahují dividendy z několika zemí, prodeje před časovým testem i po něm a ztrátový prodej. K tomu smyšlené výpisy běžných a spořicích účtů u Fio, KB a Raiffeisenbank (`demo/fio`, `demo/kb`, `demo/rb`).
 
 - Přepnutí: **Nastavení a data → Zdroj dat → Demo data** (nebo tlačítko na Přehledu, dokud nemáte nahrané exporty). V hlavičce se pak zobrazí štítek **DEMO**.
 - Demo režim má vlastní nastavení (`data/settings.demo.json`), takže se v něm neukáží vaše osobní údaje a vaše nastavení zůstane beze změny. Nahrané exporty se vždy uloží mezi vaše vlastní.
-- Přegenerování (stáhne aktuální ceny z Yahoo Finance): `npm run demo:generate [YYYY-MM-DD]`.
+- Přegenerování (stáhne aktuální ceny z Yahoo Finance): `npm run demo:generate [YYYY-MM-DD]`; bankovní výpisy (bez přístupu k internetu): `npm run demo:banks [YYYY-MM-DD]`.
 
 ## Soukromí
 
 - Všechna data zůstávají v počítači, ve složkách `exports/` a `data/` (u nainstalované aplikace v `%APPDATA%\myfin`, na macOS v `~/Library/Application Support/myfin`). Obě složky jsou v `.gitignore`.
 - Server poslouchá jen na `127.0.0.1`.
 - Z internetu se stahují pouze kurzy ČNB a historické ceny z Yahoo Finance; posílají se jen ISIN, tickery a názvy instrumentů.
+- Bankovní výpisy (CSV i PDF) se čtou a kategorizují jen lokálně; nastavení účtů, kategorie a pravidla jsou v `data/accounts.json`.
 
 ## Metodika (stručně)
 
@@ -140,7 +156,7 @@ npm run build && npm start
 
 Struktura:
 
-- `src/core` – parsery, FX, FIFO, daňové výpočty a analytika (čisté funkce)
+- `src/core` – parsery, FX, FIFO, daňové výpočty a analytika (čisté funkce); `src/core/accounts` – bankovní výpisy, kategorizace a statistiky účtů
 - `src/server` – Fastify API, cache ČNB a Yahoo, orchestrace
 - `src/web` – React + Mantine + ECharts
 - `tests` – testy pouze se smyšlenými daty
