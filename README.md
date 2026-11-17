@@ -79,10 +79,15 @@ git push --follow-tags
 
 ### Exporty
 
-| Broker | Co exportovat |
-| ------ | ------------- |
+| Zdroj | Co exportovat |
+| ----- | ------------- |
 | Degiro | *Transakce* (`Transactions.csv`) a *Výpis z účtu* (`Account.csv`) |
 | XTB    | *Historie účtu* – export `.zip` (nebo `.xlsx`) |
+| Fio banka | Výpis z účtu v CSV |
+| Komerční banka | Výpis z účtu v CSV |
+| Raiffeisenbank | *Pohyby na účtu* v CSV, PDF výpisy (jednotlivě nebo v `.zip`, jak je stáhne internetové bankovnictví), nebo obojí |
+
+U Raiffeisenbank stačí kterýkoli z obou zdrojů. CSV pohyby neobsahují zůstatek, PDF výpisy ano – když nahrajete obojí, aplikace pohyby spáruje podle čísla transakce, použije údaje z CSV, doplní z výpisů, co v CSV chybí, a zkontroluje, že pohyby sedí na zůstatky a součty každého výpisu. Kopie importovaných PDF výpisů se ukládají k datům (`data/store/banks/rb/<účet>/<rok>/statements/`).
 
 Poprvé exportujte celé období od založení účtu. Potom stačí exportovat jen nové období (např. posledních pár měsíců). Export buď nakopírujte do složky s exporty (`exports/`, nebo vlastní složka v Nastavení), nebo ho přetáhněte do **Nastavení a data**.
 

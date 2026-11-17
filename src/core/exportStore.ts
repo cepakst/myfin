@@ -114,12 +114,21 @@ export function multisetDiff(before: readonly ExportRecord[], after: readonly Ex
 /**
  * Combines stored records with an imported export.
  * - merge: inside the export's range the export is authoritative, outside it the stored rows stay.
+ *   An export made of several statements (`periods`, e.g. a zip of monthly statements with a missing
+ *   month) is authoritative only for the periods it covers.
  * - keepExisting: stored rows stay; from the export only rows outside the stored coverage are added.
  *   The first and last day of each covered range may be incomplete (an export made during the day),
  *   so on those days the export's rows missing in the stored data are added too (count-aware).
  * - replaceAll: the export becomes the whole history.
  */
-export function mergeRecords<T extends ExportRecord>(stored: readonly T[], incoming: readonly T[], range: DateRange, mode: ImportMode, storedCoverage: readonly DateRange[]): T[] {
+export function mergeRecords<T extends ExportRecord>(
+  stored: readonly T[],
+  incoming: readonly T[],
+  range: DateRange,
+  mode: ImportMode,
+  storedCoverage: readonly DateRange[],
+  periods: readonly DateRange[] = [range],
+): T[] {
   let out: T[];
   if (mode === 'replaceAll') out = [...incoming];
   else if (mode === 'keepExisting') {
@@ -138,12 +147,12 @@ export function mergeRecords<T extends ExportRecord>(stored: readonly T[], incom
       return true;
     });
     out = [...stored, ...extra];
-  } else out = [...stored.filter((r) => !inRange(r.date, range)), ...incoming];
+  } else out = [...stored.filter((r) => !inRanges(r.date, periods)), ...incoming];
   return sortRecords(out);
 }
 
-export function nextCoverage(coverage: readonly DateRange[], range: DateRange, mode: ImportMode): DateRange[] {
-  return mode === 'replaceAll' ? [{ ...range }] : normalizeRanges([...coverage, range]);
+export function nextCoverage(coverage: readonly DateRange[], range: DateRange, mode: ImportMode, periods: readonly DateRange[] = [range]): DateRange[] {
+  return mode === 'replaceAll' ? normalizeRanges(periods) : normalizeRanges([...coverage, ...periods]);
 }
 
 /** Coverage of stored data when no coverage was recorded (e.g. year folders copied by hand). */
@@ -181,9 +190,18 @@ export interface ImportPlan {
   newGaps: DateRange[];
 }
 
-export function planImport(stored: readonly ExportRecord[], storedCoverage: readonly DateRange[], incoming: readonly ExportRecord[], range: DateRange): ImportPlan {
-  const storedInRange = stored.filter((r) => inRange(r.date, range));
-  const results = Object.fromEntries(IMPORT_MODES.map((m) => [m, groupByYear(mergeRecords(stored, incoming, range, m, storedCoverage))])) as Record<ImportMode, Map<number, ExportRecord[]>>;
+export function planImport(
+  stored: readonly ExportRecord[],
+  storedCoverage: readonly DateRange[],
+  incoming: readonly ExportRecord[],
+  range: DateRange,
+  periods: readonly DateRange[] = [range],
+): ImportPlan {
+  const storedInRange = stored.filter((r) => inRanges(r.date, periods));
+  const results = Object.fromEntries(IMPORT_MODES.map((m) => [m, groupByYear(mergeRecords(stored, incoming, range, m, storedCoverage, periods))])) as Record<
+    ImportMode,
+    Map<number, ExportRecord[]>
+  >;
   const sByYear = groupByYear(stored);
   const sInByYear = groupByYear(storedInRange);
   const iByYear = groupByYear(incoming);
@@ -204,7 +222,8 @@ export function planImport(stored: readonly ExportRecord[], storedCoverage: read
   const added = years.reduce((s, y) => s + y.added, 0);
   const removed = years.reduce((s, y) => s + y.removed, 0);
   const oldGaps = rangeGaps(storedCoverage);
-  const newGaps = storedCoverage.length ? rangeGaps([...storedCoverage, range]).filter((g) => !oldGaps.some((o) => o.from === g.from && o.to === g.to)) : [];
+  // gaps between the periods of the export itself (a missing statement) are new gaps as well
+  const newGaps = storedCoverage.length || periods.length > 1 ? rangeGaps([...storedCoverage, ...periods]).filter((g) => !oldGaps.some((o) => o.from === g.from && o.to === g.to)) : [];
   return {
     range,
     storedCoverage: normalizeRanges(storedCoverage),
@@ -212,7 +231,7 @@ export function planImport(stored: readonly ExportRecord[], storedCoverage: read
     added,
     removed,
     conflict: removed > 0,
-    unchanged: added === 0 && removed === 0 && normalizeRanges(storedCoverage).some((c) => c.from <= range.from && c.to >= range.to),
+    unchanged: added === 0 && removed === 0 && periods.every((p) => normalizeRanges(storedCoverage).some((c) => c.from <= p.from && c.to >= p.to)),
     newGaps,
   };
 }

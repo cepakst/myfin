@@ -17,7 +17,7 @@ export function saveSettings(s: Settings, file = SETTINGS_FILE): void {
   writeFileSync(file, JSON.stringify(s, null, 2));
 }
 
-const EXPORT_EXT = /\.(csv|xlsx|zip)$/i;
+const EXPORT_EXT = /\.(csv|xlsx|zip|pdf)$/i;
 
 export function listExportFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -42,6 +42,8 @@ const CANONICAL = [
   /^xtb\/[\w-]+\/[A-Z]{3}_[\w-]+_open-positions\.xlsx$/,
   /^banks\/(fio|kb|rb)\/[\w-]+\/\d{4}\/transactions\.csv$/,
   /^banks\/(fio|kb|rb)\/[\w-]+\/balances\.csv$/,
+  /^banks\/rb\/[\w-]+\/\d{4}\/statement-transactions\.csv$/,
+  /^banks\/rb\/[\w-]+\/statements\.csv$/,
 ];
 
 export function relExportPath(dir: string, file: string): string {

@@ -6,6 +6,7 @@ data/
 *.xlsx
 *.csv
 *.zip
+*.pdf
 # Synthetic E2E fixtures only - never put real exports here
 !tests/e2e/fixtures/**/*.csv
 # Generated demo data (fictitious portfolio, scripts/generate-demo.ts) - never put real exports here

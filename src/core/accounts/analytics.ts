@@ -128,6 +128,12 @@ export function classifyFlows(txs: readonly BankTx[], ledgerAccounts: Iterable<s
     if (n) ownSet.set(n, 'own');
   }
   for (const o of own) ownSet.set(o.account, o.kind);
+  // numbers shared by several own accounts (RB foreign currency sub-accounts: `<n>/5500/USD`)
+  const shared = new Set<string>();
+  for (const a of ledgerAccounts) {
+    const m = /^(.+\/\d{4})\/[A-Z]{3}$/.exec(a);
+    if (m) shared.add(normAccount(m[1]) ?? m[1]);
+  }
   const out = new Map<string, FlowInfo>();
   for (const t of txs) {
     const cp = normAccount(t.cpAccount);
@@ -135,6 +141,8 @@ export function classifyFlows(txs: readonly BankTx[], ledgerAccounts: Iterable<s
     let info: FlowInfo;
     if (kind === 'investment' || (!kind && BROKER_NAME.test(`${t.cpName ?? ''} ${t.merchant ?? ''}`) && (!!cp || (/převod|úhrada|platba/i.test(t.bankType) && !CARD_TYPE.test(t.bankType))))) info = { flow: 'investment', otherAccount: cp };
     else if (kind === 'own' && cp !== normAccount(t.accountId)) info = { flow: 'transfer', otherAccount: cp };
+    // to/from the sub-account sharing this account's number (currency exchange between own accounts)
+    else if (cp && shared.has(cp)) info = { flow: 'transfer', otherAccount: cp };
     else if (INTERNAL_TYPE.test(t.bankType)) info = { flow: 'transfer' };
     else info = { flow: t.amount >= 0 ? 'income' : 'expense' };
     out.set(t.key, info);
@@ -349,7 +357,8 @@ export function summarizeAccounts(ledger: BankLedger, config: AccountsConfig, to
     // the balance entered by the user wins over a statement balance on the same day
     const anchors = mergeBalances(a.balancePoints, cfg.anchor ? [cfg.anchor] : []);
     const series = balanceSeries(txs, anchors);
-    const label = cfg.alias ?? a.name ?? `${BANK_NAME[a.bank]} ${a.number}`;
+    // RB foreign currency sub-accounts share the number (and name) of the CZK account
+    const label = cfg.alias ?? `${a.name ?? `${BANK_NAME[a.bank]} ${a.number}`}${a.bank === 'RB' && a.currency !== 'CZK' ? ` (${a.currency})` : ''}`;
     for (const m of series.mismatches) {
       warnings.push({ source: label, message: `Zůstatky z výpisů nesedí s pohyby v období ${m.from} – ${m.to} (rozdíl ${m.difference.toFixed(2)} ${a.currency}). Pravděpodobně chybí výpis.` });
     }

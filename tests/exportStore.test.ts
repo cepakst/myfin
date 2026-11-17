@@ -166,3 +166,55 @@ describe('planImport', () => {
     expect(planImport([], [], [rec('2024-02-01', 'n')], { from: '2024-01-01', to: '2024-12-31' }).newGaps).toEqual([]);
   });
 });
+
+describe('periods (an export made of several statements)', () => {
+  const P1 = { from: '2025-01-01', to: '2025-01-31' };
+  const P3 = { from: '2025-03-01', to: '2025-03-31' };
+  const RANGE = { from: '2025-01-01', to: '2025-03-31' };
+  const stored = [rec('2025-01-10', 's-jan-old'), rec('2025-02-10', 's-feb'), rec('2025-03-10', 's-mar-old')];
+  const incoming = [rec('2025-01-10', 'n-jan'), rec('2025-03-10', 'n-mar')];
+
+  it('merge replaces stored rows only inside the periods; rows in the gap between them survive', () => {
+    const out = mergeRecords(stored, incoming, RANGE, 'merge', [{ from: '2025-01-01', to: '2025-03-31' }], [P1, P3]);
+    expect(keys(out).sort()).toEqual(['n-jan', 'n-mar', 's-feb']);
+    // without periods the whole range is replaced (previous behaviour)
+    expect(keys(mergeRecords(stored, incoming, RANGE, 'merge', [])).sort()).toEqual(['n-jan', 'n-mar']);
+  });
+
+  it('keepExisting and replaceAll ignore the periods for rows', () => {
+    expect(keys(mergeRecords(stored, incoming, RANGE, 'replaceAll', [], [P1, P3]))).toEqual(expect.arrayContaining(['n-jan', 'n-mar']));
+    expect(keys(mergeRecords(stored, incoming, RANGE, 'replaceAll', [], [P1, P3]))).toHaveLength(2);
+    expect(keys(mergeRecords(stored, incoming, RANGE, 'keepExisting', [{ from: '2025-01-01', to: '2025-03-31' }], [P1, P3]))).toEqual(expect.arrayContaining(['s-jan-old', 's-feb', 's-mar-old']));
+  });
+
+  it('nextCoverage adds the periods (not the gap) and replaceAll keeps only the periods', () => {
+    expect(nextCoverage([], RANGE, 'merge', [P1, P3])).toEqual([P1, P3]);
+    // adjacent ranges join (2024 + January 2025), the missing February stays a gap
+    expect(nextCoverage([{ from: '2024-01-01', to: '2024-12-31' }], RANGE, 'merge', [P1, P3])).toEqual([{ from: '2024-01-01', to: '2025-01-31' }, P3]);
+    expect(nextCoverage([P1], RANGE, 'replaceAll', [P3])).toEqual([P3]);
+    // default: the whole range
+    expect(nextCoverage([], RANGE, 'merge')).toEqual([RANGE]);
+  });
+
+  it('planImport reports a gap between the export\'s own periods even with nothing stored', () => {
+    const plan = planImport([], [], incoming, RANGE, [P1, P3]);
+    expect(plan.newGaps).toEqual([{ from: '2025-02-01', to: '2025-02-28' }]);
+    expect(plan.unchanged).toBe(false);
+    // a single period: no gap, as before
+    expect(planImport([], [], incoming, RANGE).newGaps).toEqual([]);
+  });
+
+  it('planImport compares only the rows inside the periods and is unchanged only when every period is covered', () => {
+    const same = [rec('2025-01-10', 's-jan-old'), rec('2025-03-10', 's-mar-old')];
+    const cov = [{ from: '2025-01-01', to: '2025-03-31' }];
+    const plan = planImport(stored, cov, same, RANGE, [P1, P3]);
+    expect(plan).toMatchObject({ added: 0, removed: 0, unchanged: true, conflict: false });
+    // the stored February row is outside the periods: not counted as removed
+    expect(planImport(stored, cov, same, RANGE).removed).toBe(1);
+    // a period that is not covered yet
+    const partial = planImport(stored.slice(0, 1), [P1], [rec('2025-01-10', 's-jan-old')], RANGE, [P1, P3]);
+    expect(partial.unchanged).toBe(false);
+    // a changed row inside a period is a conflict
+    expect(planImport(stored, cov, [rec('2025-01-10', 'changed'), rec('2025-03-10', 's-mar-old')], RANGE, [P1, P3])).toMatchObject({ conflict: true, removed: 1, added: 1 });
+  });
+});

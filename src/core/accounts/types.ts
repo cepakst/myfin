@@ -49,6 +49,27 @@ export interface BankTx {
   /** coarse category assigned by the bank (RB) */
   bankCategory?: string;
   bankTxId?: string;
+  /** where the transaction was read from: the CSV export, a PDF statement or both */
+  source?: TxSource;
+}
+
+export type TxSource = 'csv' | 'pdf' | 'both';
+
+/** Summary of one bank statement (RB PDF): used to check that no movement is missing. */
+export interface StatementSummary {
+  /** statement number within the year ("poř. č.") */
+  seq: number;
+  /** inclusive ISO dates */
+  from: string;
+  to: string;
+  opening: number;
+  closing: number;
+  /** sum of incoming movements (positive) */
+  income: number;
+  /** sum of outgoing movements (positive) */
+  expense: number;
+  fees: number;
+  txCount: number;
 }
 
 export interface BalancePoint {

@@ -164,7 +164,7 @@ export function SettingsPage() {
               <div>
                 <Text>{demo ? 'V demo režimu nelze importovat' : 'Přetáhněte nové exporty sem'}</Text>
                 <Text size="xs" c="dimmed">
-                  Degiro: Transactions.csv a Account.csv · XTB: export .zip nebo .xlsx · Fio, Komerční banka a Raiffeisenbank: výpis nebo pohyby v CSV. Stačí export za nové období – data se uloží po letech a sloučí s uloženými. Pokud se export v překrývajícím se období od uložených dat liší, zeptám se, co s rozdíly.
+                  Degiro: Transactions.csv a Account.csv · XTB: export .zip nebo .xlsx · Fio a Komerční banka: výpis v CSV · Raiffeisenbank: pohyby v CSV, PDF výpisy (i zip) nebo obojí. Stačí export za nové období – data se uloží po letech a sloučí s uloženými. Pokud se export v překrývajícím se období od uložených dat liší, zeptám se, co s rozdíly.
                 </Text>
               </div>
             </Group>
@@ -225,7 +225,7 @@ export function SettingsPage() {
                   ))}
                   {s.storage.inbox.some((f) => f.status === 'unsupported') && (
                     <Text size="xs" c="dimmed">
-                      Dalších {s.storage.inbox.filter((f) => f.status === 'unsupported').length} souborů není podporovaný export (Degiro, XTB, výpis Fio, KB nebo Raiffeisenbank v CSV) – ignorují se.
+                      Dalších {s.storage.inbox.filter((f) => f.status === 'unsupported').length} souborů není podporovaný export (Degiro, XTB, výpis Fio nebo KB v CSV, pohyby nebo PDF výpis Raiffeisenbank) – ignorují se.
                     </Text>
                   )}
                 </Stack>

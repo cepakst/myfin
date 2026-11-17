@@ -13,7 +13,7 @@ import { dmyToIso, isoDateUtc, pad2 } from './util.js';
 export type TableKind = 'DEGIRO_TX' | 'DEGIRO_ACCOUNT' | 'XTB' | BankTableKind;
 
 /** Bank statements (accounts module), see accounts/bankTables.ts */
-export type BankTableKind = 'BANK_FIO' | 'BANK_KB' | 'BANK_RB';
+export type BankTableKind = 'BANK_FIO' | 'BANK_KB' | 'BANK_RB' | 'BANK_RB_PDF';
 
 export interface ExportTable {
   /** storage unit: 'degiro/tx', 'degiro/account', 'xtb/<account>' or 'banks/<bank>/<account>' */
@@ -29,8 +29,17 @@ export interface ExportTable {
   declaredRange?: DateRange;
   /** XTB "Open Positions" sheet (a snapshot on the report date) */
   openPositions?: { asOf: string; rows: unknown[][] };
+  /**
+   * periods the export is authoritative for when it consists of several statements (a zip of monthly
+   * statements); defaults to the whole range
+   */
+  periods?: DateRange[];
   /** account balances stated in a bank statement (end of day) */
   balances?: { date: string; balance: number }[];
+  /** statement summaries (RB PDF statements) */
+  statements?: import('./accounts/types.js').StatementSummary[];
+  /** source files kept next to the stored data (paths relative to the unit's folder) */
+  attachments?: { path: string; data: Uint8Array }[];
   warnings: string[];
 }
 
