@@ -150,7 +150,7 @@ test.describe('accounts: categorisation', () => {
     expect(s.config.overrides).toEqual({});
     await putConfig(page, { version: 1, categories: null });
     s = await accounts(page);
-    expect(s.categories).toHaveLength(19);
+    expect(s.categories).toHaveLength(21);
     expect(s.config.categories).toBeUndefined();
     // still requires version 1
     expect((await putConfig(page, { rules: [] })).status()).toBe(400);
@@ -393,7 +393,7 @@ test.describe('accounts: categorisation', () => {
     await accounts(page);
     await page.goto('/#/nastaveni');
     const table = page.getByTestId('categories-table');
-    await expect(table.locator('tbody tr')).toHaveCount(19);
+    await expect(table.locator('tbody tr')).toHaveCount(21);
     // the categories the flow classification relies on cannot be deleted or changed to another kind
     await expect(page.getByLabel('Smazat kategorii Převod mezi účty')).toBeDisabled();
     await expect(page.getByLabel('Smazat kategorii Investice')).toBeDisabled();

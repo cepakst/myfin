@@ -44,6 +44,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'taxes', name: 'Daně', kind: 'expense' },
   { id: 'other-expense', name: 'Ostatní výdaje', kind: 'expense' },
   { id: 'salary', name: 'Mzda', kind: 'income' },
+  { id: 'business', name: 'Podnikatelská činnost', kind: 'income' },
+  { id: 'gifts-received', name: 'Dary', kind: 'income' },
   { id: 'interest', name: 'Úroky', kind: 'income' },
   { id: 'other-income', name: 'Ostatní příjmy', kind: 'income' },
   { id: TRANSFER, name: 'Převod mezi účty', kind: 'neutral' },
