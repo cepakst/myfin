@@ -95,7 +95,7 @@ export function AccountsSettings() {
                       <Table.Td>
                         <TextInput
                           size="xs"
-                          placeholder={x.exportName ?? `${x.bankName} ${x.number}`}
+                          placeholder={x.defaultName}
                           value={c.alias ?? ''}
                           aria-label={`Název účtu ${x.id}`}
                           onChange={(e) => {

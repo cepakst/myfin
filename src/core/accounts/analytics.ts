@@ -20,7 +20,7 @@ import {
   type CategoryRule,
   type CategorySource,
 } from './categories.js';
-import { BANK_NAME, type BalancePoint, type Bank, type BankAccountData, type BankLedger, type BankTx, type ProductType } from './types.js';
+import { BANK_NAME, defaultAccountName, type BalancePoint, type Bank, type BankAccountData, type BankLedger, type BankTx, type ProductType } from './types.js';
 
 /** How a movement counts in the statistics */
 export type TxFlow = 'income' | 'expense' | 'transfer' | 'investment';
@@ -258,8 +258,10 @@ export interface AccountView {
   bank: Bank;
   bankName: string;
   number: string;
-  /** alias, or the name from the export, or the number */
+  /** alias, or the default name (bank · product · number); unique among the accounts */
   displayName: string;
+  /** bank · product · number (· currency), used when there is no alias */
+  defaultName: string;
   exportName?: string;
   alias?: string;
   product: ProductType;
@@ -330,6 +332,28 @@ export interface AccountsSummary {
 }
 
 /**
+ * Charts and filters tell accounts apart by name: the same alias on two accounts gets the
+ * account's default name (bank · product · number) appended. Default names are unique (number and
+ * currency), so a few passes always end with distinct names.
+ */
+export function uniqueNames(accounts: { displayName: string; defaultName: string }[]): void {
+  for (let pass = 0; pass < 3; pass++) {
+    const count = new Map<string, number>();
+    for (const a of accounts) count.set(a.displayName, (count.get(a.displayName) ?? 0) + 1);
+    let changed = false;
+    for (const a of accounts) {
+      if ((count.get(a.displayName) ?? 0) < 2) continue;
+      const next = a.displayName === a.defaultName || a.displayName.endsWith(`(${a.defaultName})`) ? a.defaultName : `${a.displayName} (${a.defaultName})`;
+      if (next !== a.displayName) {
+        a.displayName = next;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+  }
+}
+
+/**
  * Everything the accounts pages show. Hidden accounts keep their transactions in the list but are
  * left out of balances and statistics.
  */
@@ -350,6 +374,15 @@ export function summarizeAccounts(ledger: BankLedger, config: AccountsConfig, to
   const months = allDates.length ? monthsBetween(allDates[0], endDate) : [];
   const czk = (amount: number, currency: string, date: string): number | null => (currency === 'CZK' ? amount : toCzk(amount, currency, date));
 
+  // names first: the warnings below name the accounts
+  const names = new Map<string, { displayName: string; defaultName: string }>();
+  for (const a of ledger.accounts.values()) {
+    const cfg = config.accounts[a.id] ?? {};
+    const defaultName = defaultAccountName(a, cfg.product ?? inferProduct(a, txsByAcc.get(a.id) ?? []));
+    names.set(a.id, { displayName: cfg.alias ?? defaultName, defaultName });
+  }
+  uniqueNames([...names.values()]);
+
   const accounts: AccountView[] = [];
   for (const a of [...ledger.accounts.values()].sort((x, y) => (x.bank === y.bank ? (x.number < y.number ? -1 : 1) : x.bank < y.bank ? -1 : 1))) {
     const cfg = config.accounts[a.id] ?? {};
@@ -357,14 +390,13 @@ export function summarizeAccounts(ledger: BankLedger, config: AccountsConfig, to
     // the balance entered by the user wins over a statement balance on the same day
     const anchors = mergeBalances(a.balancePoints, cfg.anchor ? [cfg.anchor] : []);
     const series = balanceSeries(txs, anchors);
-    // RB foreign currency sub-accounts share the number (and name) of the CZK account
-    const label = cfg.alias ?? `${a.name ?? `${BANK_NAME[a.bank]} ${a.number}`}${a.bank === 'RB' && a.currency !== 'CZK' ? ` (${a.currency})` : ''}`;
+    const inferred = inferProduct(a, txs);
+    const { displayName: label, defaultName } = names.get(a.id)!;
     for (const m of series.mismatches) {
       warnings.push({ source: label, message: `Zůstatky z výpisů nesedí s pohyby v období ${m.from} – ${m.to} (rozdíl ${m.difference.toFixed(2)} ${a.currency}). Pravděpodobně chybí výpis.` });
     }
     const dates = txs.map((t) => t.date).sort();
     const firstKnown = [dates[0], anchors[0]?.date].filter((x): x is string => !!x).sort()[0];
-    const inferred = inferProduct(a, txs);
     const balance = series.at(endDate);
     accounts.push({
       id: a.id,
@@ -372,6 +404,7 @@ export function summarizeAccounts(ledger: BankLedger, config: AccountsConfig, to
       bankName: BANK_NAME[a.bank],
       number: a.number,
       displayName: label,
+      defaultName,
       exportName: a.name,
       alias: cfg.alias,
       product: cfg.product ?? inferred,

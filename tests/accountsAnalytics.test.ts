@@ -9,10 +9,12 @@ import {
   normAccount,
   sanitizeAccountsConfig,
   summarizeAccounts,
+  uniqueNames,
   type AccountsConfig,
+  type AccountView,
 } from '../src/core/accounts/analytics.js';
 import { buildBankLedger } from '../src/core/accounts/ledger.js';
-import { BANK_CODE, emptyBankLedger, type Bank, type BankAccountData, type BankLedger, type BankTx } from '../src/core/accounts/types.js';
+import { BANK_CODE, defaultAccountName, emptyBankLedger, type Bank, type BankAccountData, type BankLedger, type BankTx } from '../src/core/accounts/types.js';
 import { fioCsv } from './bankFixtures.js';
 
 let seq = 0;
@@ -217,7 +219,7 @@ describe('summarizeAccounts', () => {
     const by = Object.fromEntries(s.accounts.map((a) => [a.id, a]));
     expect(s.accounts.map((a) => a.id)).toEqual([FIO, KB, RB]); // sorted by bank, then number
     expect(by[KB]).toMatchObject({ balance: 34000, balanceCzk: 34000, anchored: true, txCount: 4, firstDate: '2025-05-10', lastDate: '2025-06-01', balanceDate: TODAY, hidden: false });
-    expect(by[RB]).toMatchObject({ balance: 9700, anchored: false, displayName: 'eKonto SMART', product: 'current' });
+    expect(by[RB]).toMatchObject({ balance: 9700, anchored: false, displayName: 'RB · Běžný · 222222', exportName: 'eKonto SMART', product: 'current' });
     expect(by[FIO]).toMatchObject({ balance: 600, balanceCzk: 15000, currency: 'EUR' });
     expect(s.totals.balanceCzk).toBe(58700);
 
@@ -258,7 +260,7 @@ describe('summarizeAccounts', () => {
     l.accounts.get(KB)!.balancePoints.push({ date: '2025-05-31', balance: 40000 }); // movements say 39000
     const s = summarizeAccounts(l, defaultAccountsConfig(), TODAY, eur);
     const msgs = s.warnings.map((w) => `${w.source}: ${w.message}`);
-    expect(msgs.some((m) => m.startsWith('eKonto SMART:') && m.includes('neobsahuje zůstatek'))).toBe(true);
+    expect(msgs.some((m) => m.startsWith('RB · Běžný · 222222:') && m.includes('neobsahuje zůstatek'))).toBe(true);
     expect(msgs.some((m) => m.includes('nesedí s pohyby') && m.includes('1000.00 CZK'))).toBe(true);
   });
 
@@ -398,5 +400,58 @@ describe('sanitizeAccountsConfig', () => {
     ]);
     const many = sanitizeAccountsConfig({ ownAccounts: Array.from({ length: 300 }, (_, i) => ({ account: `${1000 + i}/0100` })) });
     expect(many.ownAccounts).toHaveLength(200);
+  });
+});
+
+describe('account names', () => {
+  it('default name: bank, product and number, plus a foreign currency', () => {
+    expect(defaultAccountName({ bank: 'RB', number: '1234567890', currency: 'CZK' }, 'current')).toBe('RB · Běžný · 1234567890');
+    expect(defaultAccountName({ bank: 'RB', number: '1234567890', currency: 'USD' }, 'current')).toBe('RB · Běžný · 1234567890 · USD');
+    expect(defaultAccountName({ bank: 'KB', number: '19-1234567890', currency: 'CZK' }, 'savings')).toBe('KB · Spořicí · 19-1234567890');
+    expect(defaultAccountName({ bank: 'FIO', number: '2101112223', currency: 'CZK' }, 'term')).toBe('Fio · Termínovaný · 2101112223');
+  });
+
+  const view = (displayName: string, defaultName: string) => ({ displayName, defaultName }) as AccountView;
+  it('the same alias on two accounts gets the default name appended; unique names stay', () => {
+    const list = [view('Rodina', 'RB · Běžný · 1'), view('Rodina', 'RB · Spořicí · 2'), view('Výplata', 'KB · Běžný · 3')];
+    uniqueNames(list);
+    expect(list.map((a) => a.displayName)).toEqual(['Rodina (RB · Běžný · 1)', 'Rodina (RB · Spořicí · 2)', 'Výplata']);
+  });
+
+  it('two accounts with the export name of the holder no longer share a name', () => {
+    const SAV = '222230/5500';
+    const l = ledgerOfNames();
+    const s = summarizeAccounts(l, { ...defaultAccountsConfig(), accounts: { [SAV]: { product: 'savings' } } }, '2025-06-15', () => null);
+    expect(s.accounts.map((a) => a.displayName)).toEqual(['RB · Běžný · 222222', 'RB · Spořicí · 222230']);
+    expect(new Set(s.txs.map((t) => t.accountName)).size).toBe(2);
+
+    function ledgerOfNames(): BankLedger {
+      const ledger = emptyBankLedger();
+      for (const [id, number] of [['222222/5500', '222222'], [SAV, '222230']]) {
+        ledger.accounts.set(id, { id, bank: 'RB', number, currency: 'CZK', name: 'JAN TESTOVACI', balancePoints: [{ date: '2025-05-31', balance: 100 }] } as BankAccountData);
+        ledger.txs.push({ key: `k${number}`, bank: 'RB', accountId: id, date: '2025-05-10', amount: 10, currency: 'CZK', bankType: 'Příchozí úhrada' } as BankTx);
+      }
+      return ledger;
+    }
+  });
+});
+
+describe('uniqueNames edge cases', () => {
+  it('an alias equal to the renamed name of another account still ends unique', () => {
+    const list = [
+      { displayName: 'Rodina', defaultName: 'RB · Běžný · 1' },
+      { displayName: 'Rodina', defaultName: 'RB · Spořicí · 2' },
+      { displayName: 'Rodina (RB · Běžný · 1)', defaultName: 'KB · Běžný · 3' },
+    ];
+    uniqueNames(list);
+    expect(new Set(list.map((a) => a.displayName)).size).toBe(3);
+  });
+  it('an alias equal to another account default name: only the aliased account changes', () => {
+    const list = [
+      { displayName: 'RB · Běžný · 1', defaultName: 'RB · Běžný · 1' },
+      { displayName: 'RB · Běžný · 1', defaultName: 'KB · Běžný · 3' },
+    ];
+    uniqueNames(list);
+    expect(list.map((a) => a.displayName)).toEqual(['RB · Běžný · 1', 'RB · Běžný · 1 (KB · Běžný · 3)']);
   });
 });

@@ -88,7 +88,7 @@ export function AccountsTransactionsPage({ a }: { a: AccountsSnapshot }) {
         <MultiSelect
           label="Účty"
           placeholder={accountFilter.length ? undefined : 'Všechny účty'}
-          data={a.accounts.map((x) => ({ value: x.id, label: `${x.displayName} (${x.bankName})` }))}
+          data={a.accounts.map((x) => ({ value: x.id, label: x.alias ? `${x.displayName} (${x.bankName})` : x.displayName }))}
           value={accountFilter}
           onChange={(v) => {
             const p = new URLSearchParams(params);
