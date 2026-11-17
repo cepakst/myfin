@@ -410,3 +410,16 @@ describe('sanitizers', () => {
     for (const [, cat] of MERCHANT_DICTIONARY) expect(ids).toContain(cat);
   });
 });
+
+describe('default income categories', () => {
+  it('include business income and gifts received', () => {
+    const income = DEFAULT_CATEGORIES.filter((c) => c.kind === 'income').map((c) => [c.id, c.name]);
+    expect(income).toEqual([
+      ['salary', 'Mzda'],
+      ['business', 'Podnikatelská činnost'],
+      ['gifts-received', 'Dary'],
+      ['interest', 'Úroky'],
+      ['other-income', 'Ostatní příjmy'],
+    ]);
+  });
+});
