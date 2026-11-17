@@ -4,22 +4,29 @@
  *
  * The store keeps the bank's own columns, re-encoded as UTF-8 comma separated CSV with a marker row
  * in front (`#myfin-bank,1,<BANK>,<account number>,<currency>`), so a stored year file is
- * self-describing and the rows can be compared with a freshly read export.
+ * self-describing and the rows can be compared with a freshly read export. Movements read from RB
+ * PDF statements (rbPdfTables.ts) are stored the same way in RB CSV columns, with `pdf` as a sixth
+ * marker field.
  */
 import { parse } from 'csv-parse/sync';
 import type { DateRange, ExportRecord } from '../exportStore.js';
 import { FIELD_SEP, plausibleYear, safeAccount, type BankTableKind, type ExportTable } from '../exportTables.js';
 import { addDays, parseNum } from '../util.js';
-import { BANK_CODE, type BalancePoint, type Bank, type BankAccountData, type BankTx } from './types.js';
+import { BANK_CODE, type BalancePoint, type Bank, type BankAccountData, type BankTx, type StatementSummary } from './types.js';
 
 export const BANK_MARKER = '#myfin-bank';
 
-export const KIND_BANK: Record<BankTableKind, Bank> = { BANK_FIO: 'FIO', BANK_KB: 'KB', BANK_RB: 'RB' };
+export const KIND_BANK: Record<BankTableKind, Bank> = { BANK_FIO: 'FIO', BANK_KB: 'KB', BANK_RB: 'RB', BANK_RB_PDF: 'RB' };
+/** the CSV export kind of each bank */
 export const BANK_KIND: Record<Bank, BankTableKind> = { FIO: 'BANK_FIO', KB: 'BANK_KB', RB: 'BANK_RB' };
 const BANK_LABEL: Record<Bank, string> = { FIO: 'Fio', KB: 'KB', RB: 'Raiffeisenbank' };
+/** sixth marker field of stored movements read from PDF statements */
+export const PDF_SOURCE = 'pdf';
+/** sixth marker field of the stored statement summaries */
+export const STATEMENTS_SOURCE = 'statements';
 
 export function isBankKind(kind: string): kind is BankTableKind {
-  return kind === 'BANK_FIO' || kind === 'BANK_KB' || kind === 'BANK_RB';
+  return kind === 'BANK_FIO' || kind === 'BANK_KB' || kind === 'BANK_RB' || kind === 'BANK_RB_PDF';
 }
 
 /** UTF-8 when the bytes are valid UTF-8, otherwise windows-1250 (KB exports). */
@@ -46,7 +53,11 @@ export function detectBankKind(name: string, data: Uint8Array): BankTableKind | 
   const head = decodeBankText(sample);
   const first = head.split(/\r?\n/)[0] ?? '';
   const stored = new RegExp(`^"?${BANK_MARKER}"?,"?1"?,"?(FIO|KB|RB)"?,`).exec(first);
-  if (stored) return BANK_KIND[stored[1] as Bank];
+  if (stored) {
+    const marker = first.split(',').map((c) => c.replace(/"/g, '').trim());
+    if (marker[5] === STATEMENTS_SOURCE) return null; // statement summaries, see readStatementsCsv
+    return marker[5] === PDF_SOURCE && stored[1] === 'RB' ? 'BANK_RB_PDF' : BANK_KIND[stored[1] as Bank];
+  }
   if (/^"?Výpis č\.\s*\d+\/\d{4} z účtu/.test(first) || /"ID operace";"Datum";"Objem";"Měna"/.test(head)) return 'BANK_FIO';
   if (/^KB\+?,? ?vypis v csv/i.test(first) || /^Datum zauctovani;Datum provedeni;Protistrana;/m.test(head)) return 'BANK_KB';
   if (/Datum provedení/.test(first) && /Zaúčtovaná částka/.test(first) && /Id transakce/.test(first)) return 'BANK_RB';
@@ -96,17 +107,33 @@ interface AccountInfo {
   currency: string;
 }
 
+/**
+ * Id of a user's account. RB keeps foreign currency sub-accounts under the number of the CZK account,
+ * so for RB the currency is part of the id (and of the store folder) unless it is CZK.
+ */
+export function bankAccountId(bank: Bank, number: string, currency: string): string {
+  const base = `${number}/${BANK_CODE[bank]}`;
+  return bank === 'RB' && currency && currency !== 'CZK' ? `${base}/${currency}` : base;
+}
+
+/** Store folder name of an account (see bankAccountId). */
+export function bankAccountFolder(bank: Bank, number: string, currency: string): string {
+  return safeAccount(bank === 'RB' && currency && currency !== 'CZK' ? `${number}_${currency}` : number);
+}
+
 function splitAccount(raw: string, bank: Bank): string {
   return raw.trim().replace(new RegExp(`/${BANK_CODE[bank]}$`), '').replace(/\s/g, '');
 }
 
-function makeTable(
+export function makeTable(
   bank: Bank,
   acc: AccountInfo,
   header: string[],
   dataRows: string[][],
-  extra: { declaredRange?: DateRange; balances?: BalancePoint[]; warnings?: string[] },
+  extra: { declaredRange?: DateRange; balances?: BalancePoint[]; warnings?: string[]; kind?: BankTableKind },
 ): ExportTable {
+  const kind = extra.kind ?? BANK_KIND[bank];
+  const pdf = kind === 'BANK_RB_PDF';
   const iDate = col(header, DATE_COL[bank]);
   const iId = col(header, ID_COL[bank]);
   if (iDate < 0) throw new Error(`Nerozpoznaná hlavička výpisu ${BANK_LABEL[bank]} (chybí sloupec ${DATE_COL[bank]})`);
@@ -126,16 +153,16 @@ function makeTable(
   // the number becomes a folder name: anything else than a Czech account number is refused, so two
   // accounts can never end up in the same folder (safeAccount falls back to a shared name)
   if (!/^(\d{1,6}-)?\d{2,10}$/.test(acc.number)) throw new Error(`Neplatné číslo účtu ve výpisu ${BANK_LABEL[bank]}`);
-  const account = safeAccount(acc.number);
+  const account = bankAccountFolder(bank, acc.number, acc.currency);
   const warnings = [...(extra.warnings ?? [])];
   if (skipped) warnings.push(`${skipped} řádků bez platného data zaúčtování bylo vynecháno.`);
   return {
-    unit: `banks/${bank.toLowerCase()}/${account}`,
-    kind: BANK_KIND[bank],
-    label: `${BANK_LABEL[bank]} – účet ${acc.number}/${BANK_CODE[bank]} (${acc.currency})`,
+    unit: `banks/${bank.toLowerCase()}/${account}${pdf ? '/pdf' : ''}`,
+    kind,
+    label: `${BANK_LABEL[bank]} – účet ${acc.number}/${BANK_CODE[bank]} (${acc.currency})${pdf ? ' – PDF výpisy' : ''}`,
     account,
     currency: acc.currency,
-    header: [[BANK_MARKER, '1', bank, acc.number, acc.currency], header.map((h) => h.trim())],
+    header: [[BANK_MARKER, '1', bank, acc.number, acc.currency, ...(pdf ? [PDF_SOURCE] : [])], header.map((h) => h.trim())],
     records,
     declaredRange: extra.declaredRange,
     balances: extra.balances,
@@ -206,24 +233,27 @@ function readRb(text: string): ExportTable[] {
   const iAcc = col(header, 'Číslo účtu');
   const iCur = col(header, 'Měna účtu');
   if (iAcc < 0) throw new Error('Nerozpoznaný výpis Raiffeisenbank (chybí sloupec „Číslo účtu“)');
-  // one export is one account, but split defensively when it contains more
-  const groups = new Map<string, string[][]>();
+  // one export is one account, but split defensively when it contains more; foreign currency
+  // sub-accounts share the number of the CZK account
+  const groups = new Map<string, { number: string; currency: string; rows: string[][] }>();
   for (const r of rows.slice(1)) {
     if (r.every((c) => !(c ?? '').trim())) continue;
     const acc = splitAccount(r[iAcc] ?? '', 'RB');
     if (!acc) continue;
-    const g = groups.get(acc);
-    if (g) g.push(r);
-    else groups.set(acc, [r]);
+    const currency = (iCur >= 0 ? r[iCur]?.trim() : '') || 'CZK';
+    const k = `${acc}|${currency}`;
+    const g = groups.get(k);
+    if (g) g.rows.push(r);
+    else groups.set(k, { number: acc, currency, rows: [r] });
   }
-  return [...groups].map(([number, rs]) => makeTable('RB', { number, currency: (iCur >= 0 ? rs.find((r) => r[iCur]?.trim())?.[iCur]?.trim() : '') || 'CZK' }, header, rs, {}));
+  return [...groups.values()].map((g) => makeTable('RB', { number: g.number, currency: g.currency }, header, g.rows, {}));
 }
 
 function readStored(text: string, kind: BankTableKind): ExportTable[] {
   const rows = parse(text, { relax_column_count: true, skip_empty_lines: true, bom: true }) as string[][];
   const marker = rows[0] ?? [];
   if (marker[0] !== BANK_MARKER || marker[2] !== KIND_BANK[kind]) throw new Error('Nerozpoznaný uložený soubor banky');
-  const t = makeTable(KIND_BANK[kind], { number: marker[3] ?? '', currency: marker[4] || 'CZK' }, rows[1] ?? [], rows.slice(2), {});
+  const t = makeTable(KIND_BANK[kind], { number: marker[3] ?? '', currency: marker[4] || 'CZK' }, rows[1] ?? [], rows.slice(2), { kind });
   return [t];
 }
 
@@ -233,6 +263,7 @@ export function readBankTables(fileName: string, data: Uint8Array, kind?: BankTa
   if (!k) throw new Error(`${fileName}: neznámý formát výpisu z účtu`);
   const text = decodeBankText(data);
   if (text.startsWith(BANK_MARKER) || text.startsWith(`"${BANK_MARKER}"`)) return readStored(text, k);
+  if (k === 'BANK_RB_PDF') throw new Error(`${fileName}: PDF výpis se čte asynchronně (readRbPdfTables)`);
   if (k === 'BANK_FIO') return readFio(text);
   if (k === 'BANK_KB') return readKb(text);
   return readRb(text);
@@ -274,6 +305,43 @@ export function isBalancesFile(name: string): boolean {
 }
 
 export { mergeBalances } from './balances.js';
+
+const STATEMENT_COLUMNS = ['seq', 'from', 'to', 'opening', 'closing', 'income', 'expense', 'fees', 'txCount'] as const;
+
+/** Stored statement summaries (`banks/rb/<account>/statements.csv`)? */
+export function isStatementsFile(name: string): boolean {
+  return /(^|[\\/])statements\.csv$/i.test(name);
+}
+
+export function statementKey(s: Pick<StatementSummary, 'seq' | 'from' | 'to'>): string {
+  return `${s.from}|${s.to}|${s.seq}`;
+}
+
+/** Statement summaries file: the marker row (sixth field `statements`), then one row per statement. */
+export function writeStatementsCsv(meta: BalancesMeta, statements: readonly StatementSummary[]): string {
+  const rows = [...statements].sort((a, b) => (a.from === b.from ? a.seq - b.seq : a.from < b.from ? -1 : 1));
+  const lines = [
+    [BANK_MARKER, '1', meta.bank, safeField(meta.number), safeField(meta.currency), STATEMENTS_SOURCE].join(','),
+    STATEMENT_COLUMNS.join(','),
+    ...rows.map((s) => STATEMENT_COLUMNS.map((c) => String(s[c])).join(',')),
+  ];
+  return lines.join('\n') + '\n';
+}
+
+export function readStatementsCsv(text: string): { meta: BalancesMeta | null; statements: StatementSummary[] } {
+  const rows = parse(text, { relax_column_count: true, skip_empty_lines: true, bom: true }) as string[][];
+  const m = rows[0] ?? [];
+  const meta = m[0] === BANK_MARKER && (m[2] === 'FIO' || m[2] === 'KB' || m[2] === 'RB') && m[5] === STATEMENTS_SOURCE ? { bank: m[2] as Bank, number: m[3] ?? '', currency: m[4] || 'CZK' } : null;
+  const statements: StatementSummary[] = [];
+  if (!meta) return { meta, statements };
+  for (const r of rows.slice(2)) {
+    const [seq, from, to, ...nums] = r;
+    const v = nums.map(Number);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(to ?? '') || v.length < 6 || v.some((x) => !Number.isFinite(x))) continue;
+    statements.push({ seq: Number(seq) || 0, from, to, opening: v[0], closing: v[1], income: v[2], expense: v[3], fees: v[4], txCount: v[5] });
+  }
+  return { meta, statements };
+}
 
 // --- normalised transactions ---
 
@@ -321,10 +389,11 @@ function fioMerchant(text: string | undefined): string | undefined {
 export function bankTxsFromTable(t: ExportTable): { account: BankAccountData; txs: BankTx[] } {
   if (!isBankKind(t.kind)) throw new Error('Not a bank table');
   const bank = KIND_BANK[t.kind];
+  const source = t.kind === 'BANK_RB_PDF' ? 'pdf' : 'csv';
   const marker = t.header[0] as string[];
   const header = (t.header[t.header.length - 1] as string[]).map(String);
   const number = String(marker[3] ?? t.account ?? '');
-  const accountId = `${number}/${BANK_CODE[bank]}`;
+  const accountId = bankAccountId(bank, number, t.currency ?? 'CZK');
   const c = (name: string, nth = 0) => col(header, name, nth);
   const at = (r: string[], i: number) => (i >= 0 ? r[i] : undefined);
   const txs: BankTx[] = [];
@@ -430,7 +499,25 @@ export function bankTxsFromTable(t: ExportTable): { account: BankAccountData; tx
     const base = `${bank}:${accountId}:${tx.bankTxId ?? `h${hash(rec.key)}`}`;
     const n = seenKeys.get(base) ?? 0;
     seenKeys.set(base, n + 1);
-    txs.push({ key: n ? `${base}#${n}` : base, ...tx });
+    const key = n ? `${base}#${n}` : base;
+    txs.push({ key, ...tx, source });
+    // RB charges a fee on top of the booked amount (column "Poplatky", negative): a movement of its
+    // own, so balances add up and the fee lands in the fees category
+    const fee = bank === 'RB' ? num(at(r, c('Poplatky'))) : undefined;
+    if (fee) {
+      txs.push({
+        key: `${key}#fee`,
+        bank,
+        accountId,
+        date: rec.date,
+        amount: fee,
+        currency: tx.currency,
+        bankType: 'Poplatek',
+        message: tx.bankType ? `Poplatek k transakci: ${tx.bankType}` : undefined,
+        bankTxId: tx.bankTxId,
+        source,
+      });
+    }
   }
   return {
     account: { id: accountId, bank, number, name, currency: t.currency ?? 'CZK', balancePoints: t.balances ? [...t.balances] : [] },

@@ -24,7 +24,7 @@ export function AccountsEmpty() {
     <Alert color="blue" title="Zatím tu nejsou žádné výpisy z účtů" data-testid="accounts-empty">
       <Group justify="space-between">
         <Text size="sm">
-          Uložte výpisy ve formátu CSV z Fio banky, Komerční banky nebo Raiffeisenbank do složky s exporty (například do podsložek <code>fio</code>, <code>kb</code>, <code>rb</code>), nebo
+          Uložte výpisy ve formátu CSV z Fio banky nebo Komerční banky, pohyby v CSV nebo PDF výpisy z Raiffeisenbank do složky s exporty (například do podsložek <code>fio</code>, <code>kb</code>, <code>rb</code>), nebo
           je nahrajte v{' '}
           <Anchor component={Link} to="/nastaveni">
             Nastavení
@@ -93,7 +93,7 @@ export function AccountsOverviewPage({ a }: { a: AccountsSnapshot }) {
         </Alert>
       )}
 
-      <Section title="Účty" hint="Zůstatek k poslednímu dni s daty. U účtů, jejichž export zůstatek neobsahuje (Raiffeisenbank), zadejte aktuální zůstatek v Nastavení.">
+      <Section title="Účty" hint="Zůstatek k poslednímu dni s daty. U účtů, jejichž export zůstatek neobsahuje (Raiffeisenbank bez PDF výpisů), zadejte aktuální zůstatek v Nastavení.">
         <Table.ScrollContainer minWidth={640}>
           <Table striped highlightOnHover data-testid="accounts-table">
             <Table.Thead>

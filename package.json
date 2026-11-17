@@ -39,7 +39,8 @@
       "dist/web/**",
       "dist/electron/**",
       "demo/**",
-      "package.json"
+      "package.json",
+      "!**/node_modules/@napi-rs/**"
     ],
     "publish": null,
     "win": {
@@ -83,6 +84,7 @@
     "exceljs": "^4.4.0",
     "fastify": "^5.12.7",
     "jszip": "^3.10.2",
+    "pdfjs-dist": "^4.10.38",
     "yahoo-finance2": "^4.0.5"
   },
   "devDependencies": {

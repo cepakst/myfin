@@ -3,6 +3,9 @@
  *   degiro/<year>/Transactions.csv, degiro/<year>/Account.csv
  *   xtb/<account>/<year>/<CCY>_<account>_<year>.xlsx, xtb/<account>/<CCY>_<account>_open-positions.xlsx
  *   banks/<bank>/<account>/<year>/transactions.csv, banks/<bank>/<account>/balances.csv (accounts module)
+ *   banks/rb/<account>/<year>/statement-transactions.csv (movements from RB PDF statements),
+ *   banks/rb/<account>/statements.csv (statement summaries), banks/rb/<account>/<year>/statements/*.pdf
+ *   (copies of the imported PDF statements)
  * Imported periods are recorded in myfin-coverage.json, imported source files (by content hash) in
  * imports.json. Replaced store files and uploaded originals go to _archiv/<timestamp>/ in the store.
  * The user's exports folder is only read, never written.
@@ -40,8 +43,21 @@ import {
   xtbYearFileName,
   type ExportTable,
 } from '../core/exportTables.js';
-import { BANK_MARKER, isBankKind, KIND_BANK, mergeBalances, readBalancesCsv, readBankTables, writeBalancesCsv } from '../core/accounts/bankTables.js';
-import type { BalancePoint } from '../core/accounts/types.js';
+import {
+  BANK_MARKER,
+  isBankKind,
+  KIND_BANK,
+  mergeBalances,
+  readBalancesCsv,
+  readBankTables,
+  readStatementsCsv,
+  statementKey,
+  writeBalancesCsv,
+  writeStatementsCsv,
+} from '../core/accounts/bankTables.js';
+import { NotRbStatementError } from '../core/accounts/rbPdf.js';
+import { readRbPdfTables } from '../core/accounts/rbPdfTables.js';
+import type { BalancePoint, StatementSummary } from '../core/accounts/types.js';
 import { detectFileKind } from '../core/parsers/index.js';
 import { addDays, daysBetween } from '../core/util.js';
 import { classifyExportFiles, listExportFiles, relExportPath } from './store.js';
@@ -64,6 +80,9 @@ export class ImportError extends Error {
     super(message);
   }
 }
+
+/** The file is not an export the app reads (e.g. another PDF in the exports folder); not retried. */
+export class UnsupportedFileError extends ImportError {}
 
 // --- serialisation of file system work (imports, snapshot reads) ---
 
@@ -104,16 +123,23 @@ function writeAtomic(path: string, data: string | Buffer): void {
 }
 
 export const BANK_YEAR_FILE = 'transactions.csv';
+export const BANK_PDF_YEAR_FILE = 'statement-transactions.csv';
 export const BANK_BALANCES_FILE = 'balances.csv';
+export const BANK_STATEMENTS_FILE = 'statements.csv';
 
 function unitRoot(dir: string, u: UnitRef): string {
   if (isBankKind(u.kind)) return join(dir, 'banks', KIND_BANK[u.kind].toLowerCase(), u.account ?? 'ucet');
   return u.kind === 'XTB' ? join(dir, 'xtb', u.account ?? 'ucet') : join(dir, 'degiro');
 }
 
+/** Year file name of a bank unit: the CSV export and the PDF statements of an account are kept apart. */
+function bankYearFileName(kind: ExportTable['kind']): string {
+  return kind === 'BANK_RB_PDF' ? BANK_PDF_YEAR_FILE : BANK_YEAR_FILE;
+}
+
 function yearFile(dir: string, u: UnitRef, year: number): string {
   const root = join(unitRoot(dir, u), String(year));
-  if (isBankKind(u.kind)) return join(root, BANK_YEAR_FILE);
+  if (isBankKind(u.kind)) return join(root, bankYearFileName(u.kind));
   return u.kind === 'XTB' ? join(root, xtbYearFileName(u.currency ?? 'CZK', u.account ?? 'ucet', year)) : join(root, DEGIRO_FILE[u.kind]);
 }
 
@@ -136,7 +162,7 @@ function unitYearFiles(dir: string, u: UnitRef): Map<number, string> {
       const f = readdirSync(join(root, y)).find((n) => /^[A-Z]{3}_[\w-]+_\d{4}\.xlsx$/.test(n));
       if (f) out.set(Number(y), join(root, y, f));
     } else if (isBankKind(u.kind)) {
-      const p = join(root, y, BANK_YEAR_FILE);
+      const p = join(root, y, bankYearFileName(u.kind));
       if (existsSync(p)) out.set(Number(y), p);
     } else {
       const p = join(root, y, DEGIRO_FILE[u.kind]);
@@ -183,6 +209,14 @@ export async function readExportTables(fileName: string, data: Uint8Array): Prom
   const kind = detectFileKind(fileName, data);
   if (kind === 'DEGIRO_TX' || kind === 'DEGIRO_ACCOUNT') return [readDegiroTable(new TextDecoder('utf-8').decode(data), kind)];
   if (kind === 'XTB') return readXtbTables(data, fileName);
+  if (kind === 'BANK_RB_PDF') {
+    try {
+      return await readRbPdfTables(fileName, data);
+    } catch (e) {
+      if (e instanceof NotRbStatementError) throw new UnsupportedFileError(`${fileName}: ${e.message} Z PDF souborů aplikace čte jen výpisy z účtu Raiffeisenbank.`);
+      throw new ImportError(`${fileName}: PDF se nepodařilo přečíst (${(e as Error).message}).`);
+    }
+  }
   if (isBankKind(kind)) {
     try {
       return readBankTables(fileName, data, kind);
@@ -191,7 +225,7 @@ export async function readExportTables(fileName: string, data: Uint8Array): Prom
     }
   }
   throw new ImportError(
-    `Neznámý formát souboru ${fileName}. Podporované jsou Degiro Transactions.csv a Account.csv, export XTB (.zip nebo .xlsx) a výpisy z účtu v CSV od Fio banky, Komerční banky a Raiffeisenbank.`,
+    `Neznámý formát souboru ${fileName}. Podporované jsou Degiro Transactions.csv a Account.csv, export XTB (.zip nebo .xlsx), výpisy z účtu v CSV od Fio banky, Komerční banky a Raiffeisenbank a PDF výpisy Raiffeisenbank (i v zipu).`,
   );
 }
 
@@ -265,11 +299,16 @@ function defaultRange(t: ExportTable): DateRange | undefined {
 const DEGIRO_GAP_TOLERANCE_DAYS = 10;
 /** Exports that state their period (XTB, Fio and KB statements): every uncovered day is a real gap. */
 function statesPeriod(kind: ExportTable['kind']): boolean {
-  return kind === 'XTB' || kind === 'BANK_FIO' || kind === 'BANK_KB';
+  return kind === 'XTB' || kind === 'BANK_FIO' || kind === 'BANK_KB' || kind === 'BANK_RB_PDF';
 }
 function relevantGaps(kind: ExportTable['kind'], gaps: DateRange[]): DateRange[] {
   if (statesPeriod(kind)) return gaps;
   return gaps.filter((g) => daysBetween(g.from, g.to) + 1 > DEGIRO_GAP_TOLERANCE_DAYS);
+}
+
+/** Periods the export is authoritative for: its statements, or the (entered) range. */
+function periodsOf(t: ExportTable, rangeOverride?: DateRange): DateRange[] | undefined {
+  return rangeOverride ? [rangeOverride] : t.periods;
 }
 
 async function previewUnit(dir: string, t: ExportTable, db: CoverageDb, rangeOverride?: DateRange): Promise<{ preview: UnitPreview; stored: StoredUnit }> {
@@ -283,7 +322,7 @@ async function previewUnit(dir: string, t: ExportTable, db: CoverageDb, rangeOve
   if (dataRange && (range.from > dataRange.from || range.to < dataRange.to)) {
     throw new ImportError(`Období exportu musí zahrnovat všechny jeho řádky (${czDate(dataRange.from)} – ${czDate(dataRange.to)}).`);
   }
-  const plan = planImport(stored.records, cov, t.records, range);
+  const plan = planImport(stored.records, cov, t.records, range, periodsOf(t, rangeOverride));
   const headerOk = (!stored.header || headerSignature({ header: stored.header }) === headerSignature(t)) && stored.unreadable.length === 0;
   const warnings = [...t.warnings];
   for (const u of stored.unreadable) warnings.push(`Uložený soubor ${u.path} nelze přečíst (${u.error}). Lze jen nahradit celou historii.`);
@@ -403,7 +442,8 @@ async function applyTables(dir: string, tables: ExportTable[], mode: ImportMode,
   for (const t of tables) {
     const { preview, stored } = await previewUnit(dir, t, db, rangeOverride);
     if (!preview.allowedModes.includes(mode)) throw new ImportError(`${t.label}: zvolenou možnost nelze použít – ${preview.warnings.join(' ')}`);
-    const merged = mergeRecords(stored.records, t.records, preview.range, mode, preview.plan.storedCoverage);
+    const periods = periodsOf(t, rangeOverride) ?? [preview.range];
+    const merged = mergeRecords(stored.records, t.records, preview.range, mode, preview.plan.storedCoverage, periods);
     const byYear = groupByYear(merged);
     const storedByYear = groupByYear(stored.records);
     const header = stored.header && mode !== 'replaceAll' ? stored.header : t.header;
@@ -428,15 +468,18 @@ async function applyTables(dir: string, tables: ExportTable[], mode: ImportMode,
       const target = join(unitRoot(dir, t), BANK_BALANCES_FILE);
       const old = existsSync(target) ? readStoredBalances(target) : null;
       // same rules as the rows: replaceAll = only the export, keepExisting = stored ones win,
-      // merge = inside the export's period (incl. the opening balance the day before) the export wins
+      // merge = inside the export's periods (incl. the opening balance the day before) the export wins
       const stored = old?.points ?? [];
-      const from = addDays(preview.range.from, -1);
+      const inPeriods = (date: string) => periods.some((r) => date >= addDays(r.from, -1) && date <= r.to);
       const merged =
         mode === 'replaceAll'
           ? mergeBalances([], t.balances)
           : mode === 'keepExisting'
             ? mergeBalances(t.balances, stored)
-            : mergeBalances(stored.filter((p) => p.date < from || p.date > preview.range.to), t.balances);
+            : mergeBalances(
+                stored.filter((p) => !inPeriods(p.date)),
+                t.balances,
+              );
       const data = writeBalancesCsv({ bank: KIND_BANK[t.kind], number: String((t.header[0] as unknown[])[3] ?? t.account ?? ''), currency: t.currency ?? 'CZK' }, merged);
       if (!old || old.text !== data) {
         const keepsAll = !!old && old.points.every((p) => merged.some((q) => q.date === p.date && q.balance === p.balance));
@@ -444,7 +487,42 @@ async function applyTables(dir: string, tables: ExportTable[], mode: ImportMode,
         toWrite.push({ target, data });
       }
     }
-    const entry: CoverageEntry = { coverage: nextCoverage(preview.plan.storedCoverage, preview.range, mode), openPositionsAsOf: db[t.unit]?.openPositionsAsOf };
+    if (t.statements?.length && isBankKind(t.kind)) {
+      // statement summaries: a statement of the same period and number is replaced, the rest stays
+      // (replaceAll keeps only the imported statements)
+      const target = join(unitRoot(dir, t), BANK_STATEMENTS_FILE);
+      let oldText: string | null = null;
+      let old: StatementSummary[] = [];
+      try {
+        if (existsSync(target)) {
+          oldText = readFileSync(target, 'utf-8');
+          old = readStatementsCsv(oldText).statements;
+        }
+      } catch {
+        /* unreadable: rewritten from the import */
+      }
+      const incomingKeys = new Set(t.statements.map(statementKey));
+      const kept = mode === 'replaceAll' ? [] : mode === 'keepExisting' ? old : old.filter((s) => !incomingKeys.has(statementKey(s)) && !periods.some((r) => s.from >= r.from && s.to <= r.to));
+      const keptKeys = new Set(kept.map(statementKey));
+      const mergedStatements = [...kept, ...t.statements.filter((s) => !keptKeys.has(statementKey(s)))];
+      const data = writeStatementsCsv({ bank: KIND_BANK[t.kind], number: String((t.header[0] as unknown[])[3] ?? t.account ?? ''), currency: t.currency ?? 'CZK' }, mergedStatements);
+      if (oldText !== data) {
+        if (oldText !== null && old.some((s) => !mergedStatements.some((m) => statementKey(m) === statementKey(s)))) toArchive.push(target);
+        toWrite.push({ target, data });
+      }
+    }
+    for (const a of t.attachments ?? []) {
+      // copies of the source PDFs; a different file under the same name (a corrected statement)
+      // replaces the old copy, which goes to the archive
+      const target = join(unitRoot(dir, t), ...a.path.split('/'));
+      if (!isInside(target, unitRoot(dir, t))) continue;
+      if (existsSync(target)) {
+        if (sha256(readFileSync(target)) === sha256(a.data)) continue;
+        toArchive.push(target);
+      }
+      toWrite.push({ target, data: Buffer.from(a.data) });
+    }
+    const entry: CoverageEntry = { coverage: nextCoverage(preview.plan.storedCoverage, preview.range, mode, periods), openPositionsAsOf: db[t.unit]?.openPositionsAsOf };
     if (t.kind === 'XTB' && t.openPositions && (!entry.openPositionsAsOf || mode === 'replaceAll' || t.openPositions.asOf >= entry.openPositionsAsOf)) {
       const root = unitRoot(dir, t);
       if (isDir(root)) for (const n of readdirSync(root)) if (/_open-positions\.xlsx$/.test(n)) toArchive.push(join(root, n));
@@ -652,7 +730,8 @@ async function scanInbox(store: string, inbox: string, settleMs: number): Promis
       if (tables.length === 0) throw new ImportError('export neobsahuje žádná data');
       todo.push({ rel: f.rel, hash: f.hash, tables, end: tables.map((t) => defaultRange(t)?.to ?? '').sort().pop() ?? '' });
     } catch (e) {
-      manifest[f.hash] = { path: f.rel, status: 'error', at: new Date().toISOString(), message: (e as Error).message };
+      // a file that is not an export (another PDF) is remembered and not read again on every scan
+      manifest[f.hash] = { path: f.rel, status: e instanceof UnsupportedFileError ? 'unsupported' : 'error', at: new Date().toISOString(), message: (e as Error).message };
     }
   }
   // newest export first: a corrected newer export becomes effective, an older one that differs
@@ -667,7 +746,9 @@ async function scanInbox(store: string, inbox: string, settleMs: number): Promis
       else {
         const r = await applyTables(store, f.tables, 'merge', undefined, null);
         const added = r.units.reduce((s, u) => s + u.added, 0);
-        manifest[f.hash] = { path: f.rel, status: 'imported', at, message: `nových řádků: ${added}` };
+        // notes such as skipped PDFs stay visible with the file after a restart
+        const notes = [...new Set(plan.units.flatMap((u) => u.warnings))];
+        manifest[f.hash] = { path: f.rel, status: 'imported', at, message: [`nových řádků: ${added}`, ...notes].join(' · ').slice(0, 1000) };
         messages.push(`Importován soubor ${f.rel} (nových řádků: ${added}).`);
         for (const w of plan.units.flatMap((u) => u.warnings)) messages.push(`${f.rel}: ${w}`);
       }
@@ -756,10 +837,17 @@ function storedUnits(dir: string): UnitRef[] {
       const probe: UnitRef = { unit: `banks/${bank.toLowerCase()}/${account}`, kind, label: '', account };
       const first = [...unitYearFiles(dir, probe).values()][0];
       const balances = join(root, account, BANK_BALANCES_FILE);
-      // an account without any movement (e.g. a foreign currency account) has only stated balances
-      const meta = (first && bankMarker(first)) ?? (existsSync(balances) ? bankMarker(balances) : null);
-      if (!meta) continue;
-      out.push({ ...probe, currency: meta.currency, label: `${BANK_UNIT_LABEL[bank]} – účet ${meta.number || account} (${meta.currency})` });
+      // an account without any movement (e.g. a foreign currency account) has only stated balances;
+      // RB CSV exports carry no balances, so there the balances come from PDF statements
+      const meta = (first && bankMarker(first)) ?? (kind !== 'BANK_RB' && existsSync(balances) ? bankMarker(balances) : null);
+      if (meta) out.push({ ...probe, currency: meta.currency, label: `${BANK_UNIT_LABEL[bank]} – účet ${meta.number || account} (${meta.currency})` });
+      if (kind === 'BANK_RB') {
+        const pdf: UnitRef = { unit: `${probe.unit}/pdf`, kind: 'BANK_RB_PDF', label: '', account };
+        const pdfFirst = [...unitYearFiles(dir, pdf).values()][0];
+        const statements = join(root, account, BANK_STATEMENTS_FILE);
+        const pdfMeta = (pdfFirst && bankMarker(pdfFirst)) ?? (existsSync(statements) ? bankMarker(statements) : null);
+        if (pdfMeta) out.push({ ...pdf, currency: pdfMeta.currency, label: `${BANK_UNIT_LABEL[bank]} – účet ${pdfMeta.number || account} (${pdfMeta.currency}) – PDF výpisy` });
+      }
     }
   }
   return out;
@@ -772,6 +860,7 @@ const KIND_LABEL: Record<string, string> = {
   BANK_FIO: 'Fio banka – výpis',
   BANK_KB: 'Komerční banka – výpis',
   BANK_RB: 'Raiffeisenbank – pohyby',
+  BANK_RB_PDF: 'Raiffeisenbank – PDF výpis',
   UNKNOWN: 'neznámý formát',
 };
 

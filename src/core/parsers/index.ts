@@ -1,4 +1,5 @@
 import { detectBankKind } from '../accounts/bankTables.js';
+import { looksLikePdfStatements } from '../accounts/rbPdfTables.js';
 import { sortRecords } from '../exportStore.js';
 import { headerSignature, readDegiroTable, writeCsv, type BankTableKind, type ExportTable } from '../exportTables.js';
 import { emptyLedger, type Ledger } from '../types.js';
@@ -18,6 +19,10 @@ export function detectFileKind(name: string, data: Uint8Array): Kind {
   // bank statements (accounts module) are CSV files; they never reach the investment ledger
   const bank = detectBankKind(name, data);
   if (bank) return bank;
+  // other files of the bank store (statement summaries): never an investment export
+  if (/^\uFEFF?"?#myfin-bank"?,/.test(new TextDecoder('utf-8').decode(data.subarray(0, 32)))) return 'BANK_RB_PDF';
+  // RB PDF statements, also as the zip the internet banking downloads (XTB zips hold workbooks)
+  if (looksLikePdfStatements(name, data)) return 'BANK_RB_PDF';
   if (lower.endsWith('.zip') || lower.endsWith('.xlsx')) return 'XTB';
   if (lower.endsWith('.csv')) {
     const head = new TextDecoder('utf-8').decode(data.slice(0, 600)).split(/\r?\n/)[0] ?? '';

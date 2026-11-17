@@ -160,7 +160,7 @@ export function AccountsSettings() {
           </Table.ScrollContainer>
         )}
         <Text size="xs" c="dimmed">
-          Zůstatek k datu zadejte u účtů, jejichž export zůstatek neobsahuje (Raiffeisenbank): zůstatek na konci zadaného dne, například ten aktuální z internetového bankovnictví.
+          Zůstatek k datu zadejte u účtů, jejichž export zůstatek neobsahuje (Raiffeisenbank jen s CSV pohyby – PDF výpisy zůstatky obsahují): zůstatek na konci zadaného dne, například ten aktuální z internetového bankovnictví.
           Zůstatky v ostatních dnech se dopočítají z pohybů. Skryté účty se nezapočítávají do zůstatků ani statistik.
         </Text>
 
